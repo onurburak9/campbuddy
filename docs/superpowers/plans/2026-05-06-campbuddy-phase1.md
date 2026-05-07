@@ -6,7 +6,7 @@
 
 **Architecture:** APScheduler fires periodic jobs per scan config. Each job calls camply's OO API for availability, attempts Playwright add-to-cart via an isolated sidecar container, and dispatches notifications. All results written to SQLite regardless of outcome. A living documentation network (CLAUDE.md, ARCHITECTURE.md, ADRs) is maintained alongside the code.
 
-**Tech Stack:** Python 3.11, SQLAlchemy 2.0, APScheduler 3.x, camply 0.34+, Playwright sidecar (FastAPI), httpx, cryptography (Fernet), pydantic-settings, click, pytest, pytest-cov, pytest-mock, respx
+**Tech Stack:** Python 3.11, SQLAlchemy 2.0, APScheduler 3.x, camply 0.34+, Playwright sidecar (FastAPI), httpx, cryptography (Fernet), pydantic v1 (BaseSettings built-in), click, pytest, pytest-cov, pytest-mock, respx
 
 ---
 
@@ -266,7 +266,7 @@ Expected: `ModuleNotFoundError: No module named 'config.settings'`
 - [ ] **Step 3: Implement `config/settings.py`**
 
 ```python
-from pydantic_settings import BaseSettings
+from pydantic import BaseSettings  # pydantic v1 built-in — do NOT use pydantic_settings
 
 
 class Settings(BaseSettings):
@@ -280,7 +280,9 @@ class Settings(BaseSettings):
     playwright_service_url: str = "http://playwright:8001"
     database_url: str = "sqlite:///./data/campbuddy.db"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 
 def get_settings() -> Settings:
