@@ -1,8 +1,28 @@
+from datetime import datetime, date, timezone
+
 import pytest
-from datetime import datetime, date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from db.models import Base, User, Scan, ScanRun, ScanResult
+
+from db.models import (
+    Base,
+    Scan,
+    ScanOutcome,
+    ScanResult,
+    ScanRun,
+    ScanStatus,
+    User,
+)
+from db.session import (
+    create_tables,
+    get_db,
+    make_engine,
+    make_session_factory,
+)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 @pytest.fixture
@@ -11,6 +31,20 @@ def db():
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
+
+
+def _make_scan(db: Session, user: User) -> Scan:
+    scan = Scan(
+        user_id=user.id,
+        search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
+        polling_interval=300,
+        notify_via_email=True,
+        notify_via_telegram=False,
+        notify_on_new_only=True,
+    )
+    db.add(scan)
+    db.flush()
+    return scan
 
 
 def test_user_created_with_defaults(db):
@@ -26,18 +60,10 @@ def test_scan_created_with_defaults(db):
     user = User(email="test@example.com")
     db.add(user)
     db.flush()
-    scan = Scan(
-        user_id=user.id,
-        search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
-        polling_interval=300,
-        notify_via_email=True,
-        notify_via_telegram=False,
-        notify_on_new_only=True,
-    )
-    db.add(scan)
+    scan = _make_scan(db, user)
     db.commit()
     assert scan.id is not None
-    assert scan.status == "active"
+    assert scan.status == ScanStatus.active
     assert scan.nights == 1
     assert scan.provider == "RecreationDotGov"
 
@@ -46,21 +72,12 @@ def test_scan_run_always_writable(db):
     user = User(email="test@example.com")
     db.add(user)
     db.flush()
-    scan = Scan(
-        user_id=user.id,
-        search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
-        polling_interval=300,
-        notify_via_email=True,
-        notify_via_telegram=False,
-        notify_on_new_only=True,
-    )
-    db.add(scan)
-    db.flush()
-    for outcome in ["success", "no_results", "error"]:
+    scan = _make_scan(db, user)
+    for outcome in [ScanOutcome.success, ScanOutcome.no_results, ScanOutcome.error]:
         run = ScanRun(
             scan_id=scan.id,
-            started_at=datetime.utcnow(),
-            finished_at=datetime.utcnow(),
+            started_at=_now(),
+            finished_at=_now(),
             outcome=outcome,
             sites_found=0,
         )
@@ -74,21 +91,12 @@ def test_scan_result_defaults(db):
     user = User(email="test@example.com")
     db.add(user)
     db.flush()
-    scan = Scan(
-        user_id=user.id,
-        search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
-        polling_interval=300,
-        notify_via_email=True,
-        notify_via_telegram=False,
-        notify_on_new_only=True,
-    )
-    db.add(scan)
-    db.flush()
+    scan = _make_scan(db, user)
     run = ScanRun(
         scan_id=scan.id,
-        started_at=datetime.utcnow(),
-        finished_at=datetime.utcnow(),
-        outcome="success",
+        started_at=_now(),
+        finished_at=_now(),
+        outcome=ScanOutcome.success,
         sites_found=1,
     )
     db.add(run)
@@ -103,7 +111,7 @@ def test_scan_result_defaults(db):
         booking_date=date(2026, 7, 3),
         booking_end_date=date(2026, 7, 6),
         booking_url="https://www.recreation.gov/camping/campsites/10357088",
-        first_seen_at=datetime.utcnow(),
+        first_seen_at=_now(),
     )
     db.add(result)
     db.commit()
@@ -113,14 +121,52 @@ def test_scan_result_defaults(db):
     assert result.cart_added_at is None
 
 
-def test_session_factory_get_db():
-    from db.session import make_engine, create_tables, make_session_factory, get_db
+def test_user_delete_cascades_to_scans_runs_results(db):
+    user = User(email="cascade@example.com")
+    db.add(user)
+    db.flush()
+    scan = _make_scan(db, user)
+    run = ScanRun(
+        scan_id=scan.id, started_at=_now(), finished_at=_now(),
+        outcome=ScanOutcome.success, sites_found=1,
+    )
+    db.add(run)
+    db.flush()
+    result = ScanResult(
+        scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
+        facility_name="F", site_name="1", campsite_type="T",
+        booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
+        booking_url="u", first_seen_at=_now(),
+    )
+    db.add(result)
+    db.commit()
+
+    db.delete(user)
+    db.commit()
+
+    assert db.query(Scan).filter_by(user_id=user.id).count() == 0
+    assert db.query(ScanRun).filter_by(scan_id=scan.id).count() == 0
+    assert db.query(ScanResult).filter_by(scan_id=scan.id).count() == 0
+
+
+def test_session_factory_get_db_commits_on_success():
     engine = make_engine("sqlite:///:memory:")
     create_tables(engine)
     factory = make_session_factory(engine)
     with get_db(factory) as db:
-        user = User(email="session_test@example.com")
-        db.add(user)
+        db.add(User(email="commit@example.com"))
     with get_db(factory) as db:
-        found = db.query(User).filter(User.email == "session_test@example.com").first()
-        assert found is not None
+        assert db.query(User).filter_by(email="commit@example.com").first() is not None
+
+
+def test_session_factory_get_db_rolls_back_on_exception():
+    engine = make_engine("sqlite:///:memory:")
+    create_tables(engine)
+    factory = make_session_factory(engine)
+    with pytest.raises(RuntimeError):
+        with get_db(factory) as db:
+            db.add(User(email="rollback@example.com"))
+            db.flush()
+            raise RuntimeError("simulated failure")
+    with get_db(factory) as db:
+        assert db.query(User).filter_by(email="rollback@example.com").first() is None
