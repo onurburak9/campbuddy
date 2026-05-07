@@ -1,4 +1,7 @@
-from pydantic import BaseSettings  # pydantic v1 built-in — do NOT import from pydantic_settings
+import base64
+from functools import lru_cache
+
+from pydantic import BaseSettings, validator  # pydantic v1 built-in
 
 
 class Settings(BaseSettings):
@@ -16,6 +19,19 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+    @validator("encryption_key")
+    def _valid_fernet_key(cls, v: str) -> str:
+        try:
+            raw = base64.urlsafe_b64decode(v)
+        except Exception as e:
+            raise ValueError(f"ENCRYPTION_KEY must be valid url-safe base64: {e}")
+        if len(raw) != 32:
+            raise ValueError(
+                f"ENCRYPTION_KEY must decode to exactly 32 bytes, got {len(raw)}"
+            )
+        return v
 
+
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
