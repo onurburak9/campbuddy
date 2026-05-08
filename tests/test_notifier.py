@@ -59,6 +59,20 @@ def test_telegram_contains_booking_url(mocker):
     assert "Union West" in text
 
 
+def test_telegram_skips_when_no_token(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    send_telegram("123456", make_payload(), make_settings(telegram_bot_token=""))
+    mock_post.assert_not_called()
+
+
+def test_telegram_raises_on_api_error(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = False
+    mock_post.return_value.status_code = 403
+    with pytest.raises(RuntimeError, match="403"):
+        send_telegram("123456", make_payload(), make_settings())
+
+
 def test_notify_dispatches_both_channels(mocker):
     mock_email = mocker.patch("core.notifier.send_email")
     mock_tg = mocker.patch("core.notifier.send_telegram")
@@ -67,9 +81,11 @@ def test_notify_dispatches_both_channels(mocker):
     scan.notify_via_telegram = True
     scan.user.email = "user@example.com"
     scan.user.telegram_chat_id = "123456"
-    notify(scan, make_payload(), make_settings())
-    mock_email.assert_called_once()
-    mock_tg.assert_called_once()
+    payload = make_payload()
+    settings = make_settings()
+    notify(scan, payload, settings)
+    mock_email.assert_called_once_with("user@example.com", payload, settings)
+    mock_tg.assert_called_once_with("123456", payload, settings)
 
 
 def test_notify_skips_telegram_when_no_chat_id(mocker):
@@ -83,3 +99,15 @@ def test_notify_skips_telegram_when_no_chat_id(mocker):
     notify(scan, make_payload(), make_settings())
     mock_email.assert_called_once()
     mock_tg.assert_not_called()
+
+
+def test_notify_catches_email_failure(mocker):
+    mocker.patch("core.notifier.send_email", side_effect=RuntimeError("SMTP down"))
+    mock_tg = mocker.patch("core.notifier.send_telegram")
+    scan = MagicMock()
+    scan.notify_via_email = True
+    scan.notify_via_telegram = True
+    scan.user.email = "user@example.com"
+    scan.user.telegram_chat_id = "123456"
+    notify(scan, make_payload(), make_settings())
+    mock_tg.assert_called_once()

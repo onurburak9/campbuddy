@@ -1,9 +1,10 @@
-import smtplib
 import logging
-import requests
+import smtplib
 from dataclasses import dataclass
 from datetime import date
 from email.mime.text import MIMEText
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,14 @@ class NotificationPayload:
     nights: int
 
 
-def _format_dates(p: NotificationPayload, ascii_only: bool = False) -> str:
-    sep = " - " if ascii_only else " – "
-    return f"{p.booking_date.strftime('%b %-d')}{sep}{p.booking_end_date.strftime('%b %-d')}"
+def _format_dates(p: NotificationPayload) -> str:
+    start = f"{p.booking_date.strftime('%b')} {p.booking_date.day}"
+    end = f"{p.booking_end_date.strftime('%b')} {p.booking_end_date.day}"
+    return f"{start} - {end}"
 
 
 def send_email(to: str, payload: NotificationPayload, settings) -> None:
-    dates = _format_dates(payload, ascii_only=True)
+    dates = _format_dates(payload)
     cart_line = (
         "Added to cart - complete payment within ~15 min"
         if payload.cart_added
@@ -70,7 +72,7 @@ def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:
     url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
     resp = requests.post(url, json={"chat_id": chat_id, "text": text}, timeout=10)
     if not resp.ok:
-        logger.error("Telegram failed: %s", resp.text)
+        raise RuntimeError(f"Telegram API returned {resp.status_code}")
 
 
 def notify(scan, payload: NotificationPayload, settings) -> None:
@@ -78,10 +80,10 @@ def notify(scan, payload: NotificationPayload, settings) -> None:
         try:
             send_email(scan.user.email, payload, settings)
         except Exception as e:
-            logger.error("Email error: %s", e)
+            logger.error("Email notification failed: %s", e)
 
     if scan.notify_via_telegram and scan.user.telegram_chat_id:
         try:
             send_telegram(scan.user.telegram_chat_id, payload, settings)
         except Exception as e:
-            logger.error("Telegram error: %s", e)
+            logger.error("Telegram notification failed: %s", e)
