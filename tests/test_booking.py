@@ -36,3 +36,10 @@ def test_returns_false_on_connection_error(respx_mock):
         side_effect=httpx.ConnectError("refused")
     )
     assert attempt_cart_add("https://rec.gov/site/1", "u@e.com", "pw", make_settings()) is False
+
+
+def test_returns_false_on_non_json_body(respx_mock):
+    respx_mock.post("http://playwright:8001/add-to-cart").mock(
+        return_value=httpx.Response(200, content=b"<html>Bad Gateway</html>")
+    )
+    assert attempt_cart_add("https://rec.gov/site/1", "u@e.com", "pw", make_settings()) is False

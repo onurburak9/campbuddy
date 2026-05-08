@@ -14,7 +14,11 @@ def attempt_cart_add(booking_url: str, email: str, password: str, settings) -> b
         if not resp.is_success:
             logger.error("Sidecar returned HTTP %d", resp.status_code)
             return False
-        data = resp.json()
+        try:
+            data = resp.json()
+        except Exception:
+            logger.error("Sidecar returned non-JSON body")
+            return False
         if not data.get("success"):
             logger.warning("Cart add failed: %s", data.get("error"))
         return bool(data.get("success"))
