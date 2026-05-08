@@ -16,6 +16,12 @@ def check_availability(scan) -> list:
     if cls is None:
         raise ValueError(f"Unsupported provider: {scan.provider}")
 
+    if not any([scan.rec_area_ids, scan.campground_ids, scan.campsite_ids]):
+        raise ValueError(
+            f"Scan {scan.id} has no targeting: at least one of "
+            "rec_area_ids, campground_ids, or campsite_ids is required"
+        )
+
     windows = [
         SearchWindow(
             start_date=date.fromisoformat(w["start_date"]),

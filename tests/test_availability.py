@@ -84,3 +84,10 @@ def test_optional_targets_passed_when_set(mocker):
 def test_unsupported_provider_raises():
     with pytest.raises(ValueError, match="Unsupported provider"):
         check_availability(make_scan(provider="UnknownProvider"))
+
+
+def test_no_targeting_ids_raises():
+    with pytest.raises(ValueError, match="at least one of"):
+        check_availability(make_scan(
+            rec_area_ids=None, campground_ids=None, campsite_ids=None
+        ))
