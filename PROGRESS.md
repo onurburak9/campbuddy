@@ -8,12 +8,12 @@ Status tracker for Phase 1 implementation. Refer to `ARCHITECTURE.md` for design
 |---|---|---|---|
 | M1 | Foundation (models, crypto, settings, docs) | ✅ Merged | [#1](https://github.com/onurburak9/campbuddy/pull/1) |
 | M2 | Availability — camply OO API wrapper | ✅ Merged | [#2](https://github.com/onurburak9/campbuddy/pull/2) |
-| M3 | Notifications — email + Telegram | ⏭ Next | — |
-| M4 | Booking sidecar — Playwright service + client | Pending | — |
-| M5 | Runner + Scheduler — full scan cycle | Pending | — |
-| M6 | CLI + Deployment — Docker Compose, scans.yaml | Pending | — |
+| M3 | Notifications — email + Telegram | ✅ Merged | [#3](https://github.com/onurburak9/campbuddy/pull/3) |
+| M4 | Booking sidecar — Playwright service + client | ✅ Merged | [#4](https://github.com/onurburak9/campbuddy/pull/4) |
+| M5 | Runner + Scheduler — full scan cycle | ✅ Merged | [#5](https://github.com/onurburak9/campbuddy/pull/5) |
+| M6 | CLI + Deployment — Docker Compose, scans.yaml | ✅ Merged | [#6](https://github.com/onurburak9/campbuddy/pull/6) |
 
-**Test stats:** 24 tests passing, **100% coverage** on every module shipped so far.
+**Phase 1 complete.** 47 tests passing, **96% overall coverage**. All module targets exceeded.
 
 ## What you can run locally today (after M1 + M2)
 

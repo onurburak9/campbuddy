@@ -1,0 +1,46 @@
+users:
+  - email: you@example.com
+    telegram_chat_id: ""
+    recreationgov_email: you@example.com
+    recreationgov_password: your-password
+
+scans:
+  - user_email: you@example.com
+    provider: RecreationDotGov
+    polling_interval: 300
+    rec_area_ids: [1076, 2991]
+    search_windows:
+      - start_date: "2026-07-03"
+        end_date: "2026-07-06"
+    nights: 3
+    notify_via_email: true
+    notify_via_telegram: false
+    notify_on_new_only: true
+
+  - user_email: you@example.com
+    provider: RecreationDotGov
+    polling_interval: 600
+    rec_area_ids: [2991]
+    search_windows:
+      - start_date: "2026-07-12"
+        end_date: "2026-07-13"
+      - start_date: "2026-07-19"
+        end_date: "2026-07-20"
+      - start_date: "2026-07-26"
+        end_date: "2026-07-27"
+    nights: 1
+    notify_via_email: true
+    notify_via_telegram: true
+    notify_on_new_only: true
+
+  - user_email: you@example.com
+    provider: RecreationDotGov
+    polling_interval: 900
+    rec_area_ids: [2991]
+    search_windows:
+      - start_date: "2026-06-01"
+        end_date: "2026-09-01"
+    nights: 4
+    notify_via_email: true
+    notify_via_telegram: false
+    notify_on_new_only: true

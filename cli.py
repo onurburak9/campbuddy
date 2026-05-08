@@ -1,0 +1,165 @@
+import logging
+import yaml
+import click
+from db.models import User, Scan
+from db.session import make_engine, create_tables, make_session_factory, get_db
+from config.settings import get_settings
+from core.crypto import encrypt_password
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+
+def get_factory():
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    create_tables(engine)
+    return make_session_factory(engine), settings
+
+
+@click.group()
+def cli():
+    """CampBuddy — campsite availability monitor."""
+
+
+@cli.command()
+@click.argument("yaml_path", default="config/scans.yaml")
+def seed(yaml_path: str):
+    """Seed users and scans from YAML. Safe to run multiple times."""
+    factory, settings = get_factory()
+    with open(yaml_path) as f:
+        data = yaml.safe_load(f)
+
+    with get_db(factory) as db:
+        for u in data.get("users", []):
+            user = db.query(User).filter(User.email == u["email"]).first()
+            if not user:
+                user = User(email=u["email"])
+                db.add(user)
+                db.flush()
+                logger.info("Created user %s", u["email"])
+            if u.get("telegram_chat_id"):
+                user.telegram_chat_id = str(u["telegram_chat_id"])
+            if u.get("recreationgov_email"):
+                user.recreationgov_email = u["recreationgov_email"]
+            if u.get("recreationgov_password"):
+                user.recreationgov_password = encrypt_password(
+                    str(u["recreationgov_password"]), settings.encryption_key
+                )
+        db.flush()
+
+        for s in data.get("scans", []):
+            user = db.query(User).filter(User.email == s["user_email"]).first()
+            if not user:
+                logger.error("User %s not found — skipping scan", s["user_email"])
+                continue
+            scan = Scan(
+                user_id=user.id,
+                provider=s.get("provider", "RecreationDotGov"),
+                polling_interval=s.get("polling_interval", 300),
+                rec_area_ids=s.get("rec_area_ids"),
+                campground_ids=s.get("campground_ids"),
+                campsite_ids=s.get("campsite_ids"),
+                search_windows=s["search_windows"],
+                nights=s.get("nights", 1),
+                days_of_week=s.get("days_of_week"),
+                weekends_only=s.get("weekends_only", False),
+                notify_via_email=s.get("notify_via_email", True),
+                notify_via_telegram=s.get("notify_via_telegram", False),
+                notify_on_new_only=s.get("notify_on_new_only", True),
+            )
+            db.add(scan)
+            logger.info("Added scan for %s (%s)", s["user_email"], s.get("provider", "RecreationDotGov"))
+
+    click.echo("Seed complete.")
+
+
+@cli.command("list-scans")
+def list_scans():
+    """List all scans and their current status."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        scans = db.query(Scan).join(User).all()
+        if not scans:
+            click.echo("No scans found.")
+            return
+        for s in scans:
+            windows = len(s.search_windows)
+            click.echo(
+                f"[{s.id:3}] {s.status.value:9} | {s.user.email:30} | {s.provider:20} | "
+                f"interval={s.polling_interval}s | {windows} window(s)"
+            )
+
+
+@cli.command()
+@click.argument("scan_id", type=int)
+def pause(scan_id: int):
+    """Pause an active scan."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            click.echo(f"Scan {scan_id} not found.")
+            return
+        scan.status = "paused"
+    click.echo(f"Scan {scan_id} paused.")
+
+
+@cli.command()
+@click.argument("scan_id", type=int)
+def resume(scan_id: int):
+    """Resume a paused scan."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            click.echo(f"Scan {scan_id} not found.")
+            return
+        scan.status = "active"
+    click.echo(f"Scan {scan_id} resumed.")
+
+
+@cli.command("delete-scan")
+@click.argument("scan_id", type=int)
+@click.confirmation_option(prompt="Delete scan and all its history?")
+def delete_scan(scan_id: int):
+    """Delete a scan and all associated run history."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            click.echo(f"Scan {scan_id} not found.")
+            return
+        db.delete(scan)
+    click.echo(f"Scan {scan_id} deleted.")
+
+
+@cli.command("test-notify")
+@click.argument("scan_id", type=int)
+def test_notify(scan_id: int):
+    """Send a test notification for a scan."""
+    from datetime import date
+    from core.notifier import notify, NotificationPayload
+    factory, settings = get_factory()
+    with get_db(factory) as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            click.echo(f"Scan {scan_id} not found.")
+            return
+        payload = NotificationPayload(
+            facility_name="TEST — Upper Pines Campground",
+            site_name="42",
+            campsite_type="STANDARD NONELECTRIC",
+            booking_date=date(2026, 7, 4),
+            booking_end_date=date(2026, 7, 7),
+            booking_url="https://www.recreation.gov/camping/campsites/99999",
+            cart_added=False,
+            nights=3,
+        )
+        notify(scan, payload, settings)
+    click.echo("Test notification sent.")
+
+
+if __name__ == "__main__":
+    cli()

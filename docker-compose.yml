@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      playwright:
+        condition: service_healthy
+    restart: unless-stopped
+
+  playwright:
+    build:
+      context: .
+      dockerfile: playwright_service/Dockerfile
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
