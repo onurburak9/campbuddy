@@ -1,20 +1,20 @@
 import logging
 from datetime import date
+
 from camply.containers import SearchWindow
 from camply.search import SearchRecreationDotGov
 
 logger = logging.getLogger(__name__)
 
 PROVIDER_MAP = {
-    "RecreationDotGov": "SearchRecreationDotGov",
+    "RecreationDotGov": SearchRecreationDotGov,
 }
 
 
 def check_availability(scan) -> list:
-    cls_name = PROVIDER_MAP.get(scan.provider)
-    if cls_name is None:
+    cls = PROVIDER_MAP.get(scan.provider)
+    if cls is None:
         raise ValueError(f"Unsupported provider: {scan.provider}")
-    cls = globals()[cls_name]
 
     windows = [
         SearchWindow(
