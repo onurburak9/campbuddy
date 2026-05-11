@@ -238,3 +238,32 @@ def test_digest_email_one_smtp_send_for_many_sites(mocker):
     payloads = [make_payload_at(site=str(i)) for i in range(50)]
     send_email_digest("to@example.com", payloads, make_settings())
     assert instance.sendmail.call_count == 1
+
+
+def test_digest_email_subject_cross_month_dates(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payloads = [make_payload_at(check_in=date(2026, 7, 30), check_out=date(2026, 8, 1))]
+    send_email_digest("to@example.com", payloads, make_settings())
+    raw = instance.sendmail.call_args[0][2]
+    assert _decode_subject(raw) == "1 site available — Chilkoot [Jul 30-Aug 1]"
+
+
+def test_digest_email_footer_when_all_carted_fallback(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payloads = [make_payload_at(cart_added=True), make_payload_at(site="24", cart_added=True)]
+    send_email_digest("to@example.com", payloads, make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "complete payment within" in body
+    assert "book manually" not in body
+
+
+def test_digest_email_footer_when_no_carted(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payloads = [make_payload_at(cart_added=False)]
+    send_email_digest("to@example.com", payloads, make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "book manually" in body
+    assert "complete payment within" not in body
