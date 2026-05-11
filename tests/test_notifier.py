@@ -11,6 +11,7 @@ from core.notifier import (
     send_email,
     send_email_digest,
     send_telegram,
+    send_telegram_digest,
 )
 
 
@@ -267,3 +268,56 @@ def test_digest_email_footer_when_no_carted(mocker):
     body = _decode_email_body(instance.sendmail.call_args[0][2])
     assert "book manually" in body
     assert "complete payment within" not in body
+
+
+# ---------------------------------------------------------------------------
+# Digest Telegram
+# ---------------------------------------------------------------------------
+
+
+def test_digest_telegram_lists_all_sites(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = True
+    payloads = [
+        make_payload_at(facility="Chilkoot", site="23"),
+        make_payload_at(facility="Chilkoot", site="24"),
+        make_payload_at(facility="Forks", site="5"),
+    ]
+    send_telegram_digest("123456", payloads, make_settings())
+    text = mock_post.call_args[1]["json"]["text"]
+    assert "3 sites available" in text
+    assert "Chilkoot" in text
+    assert "Forks" in text
+    assert "https://www.recreation.gov/camping/campsites/23" in text
+    assert "https://www.recreation.gov/camping/campsites/5" in text
+
+
+def test_digest_telegram_skips_when_no_token(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    payloads = [make_payload_at()]
+    send_telegram_digest("123456", payloads, make_settings(telegram_bot_token=""))
+    mock_post.assert_not_called()
+
+
+def test_digest_telegram_noop_when_empty(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    send_telegram_digest("123456", [], make_settings())
+    mock_post.assert_not_called()
+
+
+def test_digest_telegram_truncates_long_message(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = True
+    payloads = [make_payload_at(site=str(i)) for i in range(200)]
+    send_telegram_digest("123456", payloads, make_settings())
+    text = mock_post.call_args[1]["json"]["text"]
+    assert len(text) <= 4096
+    assert "more — see email" in text
+
+
+def test_digest_telegram_raises_on_api_error(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = False
+    mock_post.return_value.status_code = 429
+    with pytest.raises(RuntimeError, match="429"):
+        send_telegram_digest("123456", [make_payload_at()], make_settings())
