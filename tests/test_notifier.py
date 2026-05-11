@@ -321,3 +321,12 @@ def test_digest_telegram_raises_on_api_error(mocker):
     mock_post.return_value.status_code = 429
     with pytest.raises(RuntimeError, match="429"):
         send_telegram_digest("123456", [make_payload_at()], make_settings())
+
+
+def test_digest_telegram_cross_month_dates(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = True
+    payloads = [make_payload_at(check_in=date(2026, 7, 30), check_out=date(2026, 8, 1))]
+    send_telegram_digest("123456", payloads, make_settings())
+    text = mock_post.call_args[1]["json"]["text"]
+    assert "Jul 30-Aug 1" in text

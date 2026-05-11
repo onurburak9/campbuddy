@@ -175,7 +175,6 @@ def _telegram_digest_body(payloads: list[NotificationPayload]) -> str:
     if len(body) + 1 + len(footer) <= LIMIT:
         return body + "\n" + footer
 
-    included_lines: list[str] = []
     included_count = 0
     site_lines_total = sum(len(g) for g in by_facility.values())
     accumulated = ""
@@ -187,12 +186,12 @@ def _telegram_digest_body(payloads: list[NotificationPayload]) -> str:
         if len(candidate) + suffix_needed > LIMIT:
             break
         accumulated = candidate
-        included_lines.append(line)
         if is_site_line:
             included_count += 1
 
     remaining = site_lines_total - included_count
     truncation_suffix = f"\n... and {remaining} more — see email."
+    # footer omitted in truncated path — the "see email" suffix serves the same purpose
     return accumulated + truncation_suffix
 
 
