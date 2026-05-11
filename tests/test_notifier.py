@@ -1,9 +1,14 @@
 from datetime import date
+from email import message_from_string
 from unittest.mock import MagicMock
 
 import pytest
 
 from core.notifier import NotificationPayload, notify, send_email, send_telegram
+
+
+def _decode_email_body(raw: str) -> str:
+    return message_from_string(raw).get_payload(decode=True).decode("utf-8")
 
 
 def make_settings(**overrides):
@@ -36,18 +41,18 @@ def test_email_contains_booking_url_and_cart_status(mocker):
     mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
     instance = mock_smtp.return_value.__enter__.return_value
     send_email("to@example.com", make_payload(cart_added=True), make_settings())
-    raw = instance.sendmail.call_args[0][2]
-    assert "https://www.recreation.gov/camping/campsites/10357088" in raw
-    assert "Added to cart" in raw
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "https://www.recreation.gov/camping/campsites/10357088" in body
+    assert "Added to cart" in body
 
 
 def test_email_fallback_message_when_cart_failed(mocker):
     mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
     instance = mock_smtp.return_value.__enter__.return_value
     send_email("to@example.com", make_payload(cart_added=False), make_settings())
-    raw = instance.sendmail.call_args[0][2]
-    assert "book manually" in raw.lower()
-    assert "https://www.recreation.gov/camping/campsites/10357088" in raw
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "book manually" in body.lower()
+    assert "https://www.recreation.gov/camping/campsites/10357088" in body
 
 
 def test_telegram_contains_booking_url(mocker):

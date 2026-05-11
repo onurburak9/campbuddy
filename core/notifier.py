@@ -40,7 +40,7 @@ def send_email(to: str, payload: NotificationPayload, settings) -> None:
         f"Status: {cart_line}\n\n"
         f"Book here: {payload.booking_url}\n"
     )
-    msg = MIMEText(body, "plain", "us-ascii")
+    msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = settings.smtp_from
     msg["To"] = to
     msg["Subject"] = f"Campsite available - {payload.facility_name} [{dates}]"
