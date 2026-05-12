@@ -102,6 +102,19 @@ def test_dedup_skips_same_site_same_date(factory, scan_id, settings, mocker):
     assert mock_notify.call_count == 1
 
 
+def test_run_skips_deleted_scan(factory, scan_id, settings, mocker):
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update(
+            {"deleted_at": datetime.now(timezone.utc)}
+        )
+        db.commit()
+    mock_avail = mocker.patch("core.runner.check_availability")
+    run_scan(scan_id, factory, settings)
+    mock_avail.assert_not_called()
+    with factory() as db:
+        assert db.query(ScanRun).filter(ScanRun.scan_id == scan_id).count() == 0
+
+
 def test_dedup_notifies_same_site_different_date(factory, scan_id, settings, mocker):
     site_a = make_site(check_in=date(2026, 7, 3))
     site_b = make_site(check_in=date(2026, 7, 10))

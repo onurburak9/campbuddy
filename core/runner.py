@@ -23,11 +23,11 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         scan = (
             db.query(Scan)
             .options(joinedload(Scan.user))
-            .filter(Scan.id == scan_id, Scan.status == "active")
+            .filter(Scan.id == scan_id, Scan.status == "active", Scan.deleted_at.is_(None))
             .first()
         )
         if not scan:
-            logger.warning("Scan %d not found or inactive", scan_id)
+            logger.warning("Scan %d not found, inactive, or deleted", scan_id)
             return
         run = ScanRun(scan_id=scan_id, started_at=_now())
         db.add(run)

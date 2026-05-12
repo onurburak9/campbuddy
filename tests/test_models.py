@@ -159,6 +159,47 @@ def test_session_factory_get_db_commits_on_success():
         assert db.query(User).filter_by(email="commit@example.com").first() is not None
 
 
+def test_scan_name_is_optional(db):
+    user = User(email="name@example.com")
+    db.add(user)
+    db.flush()
+    scan = _make_scan(db, user)
+    db.commit()
+    assert scan.name is None
+    scan.name = "Yosemite July"
+    db.commit()
+    assert scan.name == "Yosemite July"
+
+
+def test_scan_soft_delete_preserves_history(db):
+    user = User(email="soft@example.com")
+    db.add(user)
+    db.flush()
+    scan = _make_scan(db, user)
+    run = ScanRun(
+        scan_id=scan.id, started_at=_now(), finished_at=_now(),
+        outcome=ScanOutcome.success, sites_found=1,
+    )
+    db.add(run)
+    db.flush()
+    result = ScanResult(
+        scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
+        facility_name="F", site_name="1", campsite_type="T",
+        booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
+        booking_url="u", first_seen_at=_now(),
+    )
+    db.add(result)
+    db.commit()
+
+    scan.deleted_at = _now()
+    db.commit()
+
+    assert db.query(Scan).filter(Scan.id == scan.id).first() is not None
+    assert db.query(ScanRun).filter(ScanRun.scan_id == scan.id).count() == 1
+    assert db.query(ScanResult).filter(ScanResult.scan_id == scan.id).count() == 1
+    assert db.query(Scan).filter(Scan.deleted_at.is_(None)).count() == 0
+
+
 def test_session_factory_get_db_rolls_back_on_exception():
     engine = make_engine("sqlite:///:memory:")
     create_tables(engine)

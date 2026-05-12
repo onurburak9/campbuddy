@@ -13,7 +13,7 @@ def build_scheduler() -> BackgroundScheduler:
 def sync_jobs(scheduler: BackgroundScheduler, session_factory, settings) -> None:
     from db.models import Scan
     with session_factory() as db:
-        active = db.query(Scan).filter(Scan.status == "active").all()
+        active = db.query(Scan).filter(Scan.status == "active", Scan.deleted_at.is_(None)).all()
         active_ids = {f"scan_{s.id}" for s in active}
         active_map = {f"scan_{s.id}": s for s in active}
 

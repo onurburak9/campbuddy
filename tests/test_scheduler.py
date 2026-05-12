@@ -53,6 +53,20 @@ def test_sync_skips_paused_scan(factory):
     scheduler.add_job.assert_not_called()
 
 
+def test_sync_skips_deleted_scan(factory):
+    from datetime import datetime, timezone
+    scan_id = add_scan(factory, status="active", interval=300)
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update(
+            {"deleted_at": datetime.now(timezone.utc)}
+        )
+        db.commit()
+    scheduler = MagicMock()
+    scheduler.get_jobs.return_value = []
+    sync_jobs(scheduler, factory, MagicMock())
+    scheduler.add_job.assert_not_called()
+
+
 def test_sync_removes_stale_job(factory):
     add_scan(factory, status="active")
     stale_job = MagicMock()

@@ -62,6 +62,7 @@ class Scan(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )
+    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider: Mapped[str] = mapped_column(String, nullable=False, default="RecreationDotGov")
     status: Mapped[ScanStatus] = mapped_column(
         SQLEnum(ScanStatus, native_enum=False),
@@ -81,6 +82,9 @@ class Scan(Base):
     notify_on_new_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     user: Mapped["User"] = relationship(back_populates="scans")

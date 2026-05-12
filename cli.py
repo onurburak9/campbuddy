@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timedelta, timezone
+
 import yaml
 import click
 from db.models import User, Scan
@@ -9,6 +11,8 @@ from core.crypto import encrypt_password
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+_RETENTION_DAYS = 180
+
 
 def get_factory():
     get_settings.cache_clear()
@@ -16,6 +20,11 @@ def get_factory():
     engine = make_engine(settings.database_url)
     create_tables(engine)
     return make_session_factory(engine), settings
+
+
+def _active_scan(db, scan_id: int):
+    """Return a non-deleted scan by id, or None."""
+    return db.query(Scan).filter(Scan.id == scan_id, Scan.deleted_at.is_(None)).first()
 
 
 @click.group()
@@ -55,6 +64,7 @@ def seed(yaml_path: str):
                 logger.error("User %s not found — skipping scan", s["user_email"])
                 continue
             scan = Scan(
+                name=s.get("name"),
                 user_id=user.id,
                 provider=s.get("provider", "RecreationDotGov"),
                 polling_interval=s.get("polling_interval", 300),
@@ -77,17 +87,18 @@ def seed(yaml_path: str):
 
 @cli.command("list-scans")
 def list_scans():
-    """List all scans and their current status."""
+    """List all active (non-deleted) scans and their current status."""
     factory, _ = get_factory()
     with get_db(factory) as db:
-        scans = db.query(Scan).join(User).all()
+        scans = db.query(Scan).join(User).filter(Scan.deleted_at.is_(None)).all()
         if not scans:
             click.echo("No scans found.")
             return
         for s in scans:
             windows = len(s.search_windows)
+            label = f" ({s.name})" if s.name else ""
             click.echo(
-                f"[{s.id:3}] {s.status.value:9} | {s.user.email:30} | {s.provider:20} | "
+                f"[{s.id:3}]{label} {s.status.value:9} | {s.user.email:30} | {s.provider:20} | "
                 f"interval={s.polling_interval}s | {windows} window(s)"
             )
 
@@ -98,7 +109,7 @@ def pause(scan_id: int):
     """Pause an active scan."""
     factory, _ = get_factory()
     with get_db(factory) as db:
-        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        scan = _active_scan(db, scan_id)
         if not scan:
             click.echo(f"Scan {scan_id} not found.")
             return
@@ -112,7 +123,7 @@ def resume(scan_id: int):
     """Resume a paused scan."""
     factory, _ = get_factory()
     with get_db(factory) as db:
-        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        scan = _active_scan(db, scan_id)
         if not scan:
             click.echo(f"Scan {scan_id} not found.")
             return
@@ -122,17 +133,36 @@ def resume(scan_id: int):
 
 @cli.command("delete-scan")
 @click.argument("scan_id", type=int)
-@click.confirmation_option(prompt="Delete scan and all its history?")
+@click.confirmation_option(prompt="Soft-delete scan? (history kept for 180 days)")
 def delete_scan(scan_id: int):
-    """Delete a scan and all associated run history."""
+    """Soft-delete a scan. Run history is retained for 180 days then pruned."""
     factory, _ = get_factory()
     with get_db(factory) as db:
-        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        scan = _active_scan(db, scan_id)
         if not scan:
             click.echo(f"Scan {scan_id} not found.")
             return
-        db.delete(scan)
-    click.echo(f"Scan {scan_id} deleted.")
+        scan.deleted_at = datetime.now(timezone.utc)
+    click.echo(f"Scan {scan_id} deleted (history retained for {_RETENTION_DAYS} days).")
+
+
+@cli.command("prune-scans")
+def prune_scans():
+    """Hard-delete scans (and their history) that were soft-deleted over 180 days ago."""
+    factory, _ = get_factory()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)
+    with get_db(factory) as db:
+        expired = (
+            db.query(Scan)
+            .filter(Scan.deleted_at.isnot(None), Scan.deleted_at < cutoff)
+            .all()
+        )
+        if not expired:
+            click.echo("No expired scans to prune.")
+            return
+        for scan in expired:
+            db.delete(scan)
+        click.echo(f"Pruned {len(expired)} expired scan(s).")
 
 
 @cli.command("test-notify")
