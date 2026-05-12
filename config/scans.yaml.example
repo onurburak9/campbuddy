@@ -1,0 +1,18 @@
+users:
+  - email: you@example.com
+    telegram_chat_id: ""
+    recreationgov_email: you@example.com
+    recreationgov_password: "your_password_here"
+
+scans:
+  - user_email: you@example.com
+    provider: RecreationDotGov
+    polling_interval: 300
+    rec_area_ids: [1074]
+    search_windows:
+      - start_date: "2026-07-16"
+        end_date: "2026-07-18"
+    nights: 2
+    notify_via_email: true
+    notify_via_telegram: false
+    notify_on_new_only: true

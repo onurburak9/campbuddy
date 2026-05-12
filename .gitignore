@@ -1,4 +1,5 @@
 .env
+config/scans.yaml
 .venv/
 *.pyc
 __pycache__/
