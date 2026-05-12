@@ -1,7 +1,10 @@
 import logging
 from datetime import datetime, timezone
 
-from db.models import Scan, ScanRun, ScanResult, User
+from sqlalchemy.orm import joinedload
+
+from db.models import Scan, ScanRun, ScanResult
+from db.session import get_db
 from core.availability import check_availability
 from core.booking import attempt_cart_add
 from core.crypto import decrypt_password
@@ -15,34 +18,53 @@ def _now():
 
 
 def run_scan(scan_id: int, session_factory, settings) -> None:
-    with session_factory() as db:
-        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.status == "active").first()
+    # Transaction 1 (fast): load config, start run
+    with get_db(session_factory) as db:
+        scan = (
+            db.query(Scan)
+            .options(joinedload(Scan.user))
+            .filter(Scan.id == scan_id, Scan.status == "active")
+            .first()
+        )
         if not scan:
             logger.warning("Scan %d not found or inactive", scan_id)
             return
-
         run = ScanRun(scan_id=scan_id, started_at=_now())
         db.add(run)
         db.flush()
+        run_id = run.id
+        db.expunge_all()
 
-        try:
-            sites = check_availability(scan)
-            run.sites_found = len(sites)
-            run.outcome = "success" if sites else "no_results"
-            user = db.query(User).filter(User.id == scan.user_id).first()
+    user = scan.user
 
-            for site in sites:
-                booking_date = (
-                    site.booking_date.date()
-                    if hasattr(site.booking_date, "date")
-                    else site.booking_date
-                )
-                booking_end_date = (
-                    site.booking_end_date.date()
-                    if hasattr(site.booking_end_date, "date")
-                    else site.booking_end_date
-                )
+    # Slow I/O: check availability — no lock held
+    try:
+        sites = check_availability(scan)
+    except Exception as e:
+        logger.exception("Scan %d failed: %s", scan_id, e)
+        with get_db(session_factory) as db:
+            run = db.query(ScanRun).filter(ScanRun.id == run_id).first()
+            run.outcome = "error"
+            run.error_message = str(e)
+            run.sites_found = 0
+            run.finished_at = _now()
+        return
 
+    try:
+        for site in sites:
+            booking_date = (
+                site.booking_date.date()
+                if hasattr(site.booking_date, "date")
+                else site.booking_date
+            )
+            booking_end_date = (
+                site.booking_end_date.date()
+                if hasattr(site.booking_end_date, "date")
+                else site.booking_end_date
+            )
+
+            # Transaction 2 (fast): check duplicate, write result
+            with get_db(session_factory) as db:
                 if scan.notify_on_new_only:
                     exists = (
                         db.query(ScanResult)
@@ -55,9 +77,8 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     )
                     if exists:
                         continue
-
                 result = ScanResult(
-                    scan_run_id=run.id,
+                    scan_run_id=run_id,
                     scan_id=scan_id,
                     campsite_id=str(site.campsite_id),
                     facility_name=site.facility_name,
@@ -70,45 +91,62 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                 )
                 db.add(result)
                 db.flush()
+                result_id = result.id
 
-                cart_added = False
-                if user and user.recreationgov_email and user.recreationgov_password:
-                    try:
-                        pw = decrypt_password(user.recreationgov_password, settings.encryption_key)
-                        cart_added = attempt_cart_add(
-                            site.booking_url, user.recreationgov_email, pw, settings,
-                            check_in=booking_date.strftime("%m-%d-%Y"),
-                            check_out=booking_end_date.strftime("%m-%d-%Y"),
-                        )
-                    except Exception as e:
-                        logger.error("Cart add error for scan %d: %s", scan_id, e)
 
+            # Slow I/O: cart add — no lock held
+            cart_added = False
+            if user and user.recreationgov_email and user.recreationgov_password:
+                try:
+                    pw = decrypt_password(user.recreationgov_password, settings.encryption_key)
+                    cart_added = attempt_cart_add(
+                        site.booking_url, user.recreationgov_email, pw, settings,
+                        check_in=booking_date.strftime("%m-%d-%Y"),
+                        check_out=booking_end_date.strftime("%m-%d-%Y"),
+                    )
+                except Exception as e:
+                    logger.error("Cart add error for scan %d: %s", scan_id, e)
+
+            # Transaction 3 (fast): persist cart status
+            with get_db(session_factory) as db:
+                result = db.query(ScanResult).filter(ScanResult.id == result_id).first()
                 result.cart_added = cart_added
                 if cart_added:
                     result.cart_added_at = _now()
 
-                payload = NotificationPayload(
-                    facility_name=site.facility_name,
-                    site_name=site.campsite_site_name,
-                    campsite_type=site.campsite_type,
-                    booking_date=booking_date,
-                    booking_end_date=booking_end_date,
-                    booking_url=site.booking_url,
-                    cart_added=cart_added,
-                    nights=scan.nights,
-                )
-                try:
-                    notify(scan, payload, settings)
+            # Slow I/O: notify — no lock held
+            payload = NotificationPayload(
+                facility_name=site.facility_name,
+                site_name=site.campsite_site_name,
+                campsite_type=site.campsite_type,
+                booking_date=booking_date,
+                booking_end_date=booking_end_date,
+                booking_url=site.booking_url,
+                cart_added=cart_added,
+                nights=scan.nights,
+            )
+            try:
+                notify(scan, payload, settings)
+                with get_db(session_factory) as db:
+                    result = db.query(ScanResult).filter(ScanResult.id == result_id).first()
                     result.notified = True
                     result.notified_at = _now()
-                except Exception as e:
-                    logger.error("Notify error for scan %d: %s", scan_id, e)
+            except Exception as e:
+                logger.error("Notify error for scan %d: %s", scan_id, e)
 
-        except Exception as e:
-            logger.exception("Scan %d failed: %s", scan_id, e)
-            run.outcome = "error"
-            run.error_message = str(e)
-            run.sites_found = 0
-        finally:
+        # Transaction 4 (fast): finalize run
+        with get_db(session_factory) as db:
+            run = db.query(ScanRun).filter(ScanRun.id == run_id).first()
+            run.outcome = "success" if sites else "no_results"
+            run.sites_found = len(sites)
             run.finished_at = _now()
-            db.commit()
+
+    except Exception as e:
+        logger.exception("Scan %d failed: %s", scan_id, e)
+        with get_db(session_factory) as db:
+            run = db.query(ScanRun).filter(ScanRun.id == run_id).first()
+            if run:
+                run.outcome = "error"
+                run.error_message = str(e)
+                run.sites_found = 0
+                run.finished_at = _now()
