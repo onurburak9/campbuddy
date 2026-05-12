@@ -221,3 +221,19 @@ def notify(scan, payload: NotificationPayload, settings) -> None:
             send_telegram(scan.user.telegram_chat_id, payload, settings)
         except Exception as e:
             logger.error("Telegram notification failed: %s", e)
+
+
+def notify_digest(scan, payloads: list[NotificationPayload], settings) -> None:
+    if not payloads:
+        return
+    if scan.notify_via_email and scan.user.email:
+        try:
+            send_email_digest(scan.user.email, payloads, settings)
+        except Exception as e:
+            logger.error("Digest email failed: %s", e)
+
+    if scan.notify_via_telegram and scan.user.telegram_chat_id:
+        try:
+            send_telegram_digest(scan.user.telegram_chat_id, payloads, settings)
+        except Exception as e:
+            logger.error("Digest Telegram failed: %s", e)
