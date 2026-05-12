@@ -194,5 +194,50 @@ def test_cart(scan_id: int, booking_url: str, check_in: str, check_out: str):
     click.echo(resp.json())
 
 
+@cli.command("update-user")
+@click.argument("user_id", type=int)
+@click.option("--email", default=None, help="New login email address.")
+@click.option("--recreationgov-email", default=None, help="Recreation.gov account email.")
+@click.option("--recreationgov-password", default=None, help="Recreation.gov password (will be encrypted).")
+@click.option("--clear-password", is_flag=True, help="Remove stored Recreation.gov password.")
+@click.option("--telegram-chat-id", default=None, help="Telegram chat ID.")
+def update_user(user_id, email, recreationgov_email, recreationgov_password, clear_password, telegram_chat_id):
+    """Update fields on a user row."""
+    factory, settings = get_factory()
+    with get_db(factory) as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            click.echo(f"User {user_id} not found.")
+            return
+        if email:
+            user.email = email
+        if recreationgov_email:
+            user.recreationgov_email = recreationgov_email
+        if recreationgov_password:
+            user.recreationgov_password = encrypt_password(recreationgov_password, settings.encryption_key)
+        if clear_password:
+            user.recreationgov_password = None
+        if telegram_chat_id:
+            user.telegram_chat_id = telegram_chat_id
+        click.echo(f"User {user_id} updated: email={user.email} rec_email={user.recreationgov_email} "
+                   f"password={'set' if user.recreationgov_password else 'none'} "
+                   f"telegram={user.telegram_chat_id}")
+
+
+@cli.command("delete-user")
+@click.argument("user_id", type=int)
+@click.confirmation_option(prompt="Delete user and all their scans and history?")
+def delete_user(user_id: int):
+    """Delete a user and all associated scans and run history."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            click.echo(f"User {user_id} not found.")
+            return
+        db.delete(user)
+    click.echo(f"User {user_id} deleted.")
+
+
 if __name__ == "__main__":
     cli()
