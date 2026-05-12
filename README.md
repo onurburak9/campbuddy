@@ -193,12 +193,13 @@ docker compose up -d --build             # rebuild and restart
 ### Backup the database
 
 ```bash
-cp data/campbuddy.db data/campbuddy.db.$(date +%Y%m%d)
+mkdir -p data/backups
+cp data/campbuddy.db data/backups/campbuddy.db.$(date +%Y%m%d)
 ```
 
-Add to crontab for automatic daily backups:
+Add to crontab for automatic daily backups (keeps last 10):
 ```
-0 3 * * * cp /path/to/campbuddy/data/campbuddy.db /path/to/campbuddy/data/campbuddy.db.$(date +\%Y\%m\%d)
+0 3 * * 0 cp /path/to/campbuddy/data/campbuddy.db /path/to/campbuddy/data/backups/campbuddy.db.$(date +\%Y\%m\%d) && ls -t /path/to/campbuddy/data/backups/campbuddy.db.* | tail -n +11 | xargs rm -f
 ```
 
 ---
