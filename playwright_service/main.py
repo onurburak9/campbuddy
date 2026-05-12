@@ -12,6 +12,8 @@ class CartRequest(BaseModel):
     booking_url: str
     email: str
     password: str
+    check_in: str  # MM-DD-YYYY
+    check_out: str  # MM-DD-YYYY
 
 
 class CartResponse(BaseModel):
@@ -21,7 +23,7 @@ class CartResponse(BaseModel):
 
 @app.post("/add-to-cart", response_model=CartResponse)
 def cart_endpoint(req: CartRequest) -> CartResponse:
-    return CartResponse(**add_to_cart(req.booking_url, req.email, req.password))
+    return CartResponse(**add_to_cart(req.booking_url, req.email, req.password, req.check_in, req.check_out))
 
 
 @app.get("/health")

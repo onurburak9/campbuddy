@@ -161,5 +161,38 @@ def test_notify(scan_id: int):
     click.echo("Test notification sent.")
 
 
+@cli.command("test-cart")
+@click.argument("scan_id", type=int)
+@click.argument("booking_url")
+@click.argument("check_in")
+@click.argument("check_out")
+def test_cart(scan_id: int, booking_url: str, check_in: str, check_out: str):
+    """Trigger an add-to-cart attempt via the Playwright service for a given scan's credentials."""
+    import requests
+    from core.crypto import decrypt_password
+    factory, settings = get_factory()
+    with get_db(factory) as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            click.echo(f"Scan {scan_id} not found.")
+            return
+        user = scan.user
+        if not user.recreationgov_email or not user.recreationgov_password:
+            click.echo("User has no Recreation.gov credentials stored.")
+            return
+        email = user.recreationgov_email
+        password = decrypt_password(user.recreationgov_password, settings.encryption_key)
+
+    playwright_url = settings.playwright_service_url
+    click.echo(f"Calling {playwright_url}/add-to-cart ...")
+    resp = requests.post(
+        f"{playwright_url}/add-to-cart",
+        json={"booking_url": booking_url, "email": email, "password": password, "check_in": check_in, "check_out": check_out},
+        timeout=120,
+    )
+    click.echo(f"Status: {resp.status_code}")
+    click.echo(resp.json())
+
+
 if __name__ == "__main__":
     cli()

@@ -54,7 +54,9 @@ HTTP client (httpx) that POSTs to the Playwright sidecar's `/add-to-cart` endpoi
 Dispatches email (smtplib/SMTP) and Telegram (Bot API via requests) based on per-scan preferences. Booking URL is always included in plain text.
 
 ### Playwright Sidecar (`playwright_service/`)
-Isolated FastAPI service in its own Docker container. Receives `POST /add-to-cart { booking_url, email, password }`, drives headless Chromium to log in and add the site to cart, returns `{ success, error }`. Runs separately so a browser crash cannot kill the scheduler.
+Isolated FastAPI service in its own Docker container. Receives `POST /add-to-cart { booking_url, email, password, check_in, check_out }` (dates in `MM-DD-YYYY`), drives headless Chromium to log in and add the site to cart, returns `{ success, error }`. Runs separately so a browser crash cannot kill the scheduler.
+
+Bot-detection hardening: `playwright-stealth`, Chrome 136 user agent + matching `sec-ch-ua` headers, human-like typing delays, and jitter between actions. Dates are pre-selected by injecting `r1s_search_session` into `localStorage` before navigating to the campsite page — see [`docs/superpowers/recreation-gov-checkout-flow.md`](docs/superpowers/recreation-gov-checkout-flow.md) for the full site map.
 
 ### Crypto (`core/crypto.py`)
 Fernet (AES-128-CBC + HMAC) encrypt/decrypt for Recreation.gov passwords. Key lives in `ENCRYPTION_KEY` env var; validated at startup by `Settings`.
@@ -74,8 +76,8 @@ Scheduler fires scan_id=N
         → for each site:
             → dedup check (campsite_id + booking_date already in scan_results?)
             → write ScanResult(cart_added=False, notified=False)
-            → booking.attempt_cart_add(url, email, password)
-                → POST playwright_service /add-to-cart
+            → booking.attempt_cart_add(url, email, password, check_in, check_out)
+                → POST playwright_service /add-to-cart {booking_url, email, password, check_in, check_out}
             → notifier.notify(scan, payload)
                 → send_email() and/or send_telegram()
             → update ScanResult(cart_added, notified, timestamps)

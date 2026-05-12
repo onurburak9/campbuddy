@@ -76,7 +76,9 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     try:
                         pw = decrypt_password(user.recreationgov_password, settings.encryption_key)
                         cart_added = attempt_cart_add(
-                            site.booking_url, user.recreationgov_email, pw, settings
+                            site.booking_url, user.recreationgov_email, pw, settings,
+                            check_in=booking_date.strftime("%m-%d-%Y"),
+                            check_out=booking_end_date.strftime("%m-%d-%Y"),
                         )
                     except Exception as e:
                         logger.error("Cart add error for scan %d: %s", scan_id, e)

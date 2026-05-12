@@ -10,3 +10,5 @@ data/
 htmlcov/
 dist/
 build/
+.playwright-mcp/
+.claude/worktrees/
