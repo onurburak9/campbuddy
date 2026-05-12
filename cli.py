@@ -235,7 +235,7 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
     """Update fields on a user row."""
     factory, settings = get_factory()
     with get_db(factory) as db:
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
         if not user:
             click.echo(f"User {user_id} not found.")
             return
@@ -256,17 +256,21 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
 
 @cli.command("delete-user")
 @click.argument("user_id", type=int)
-@click.confirmation_option(prompt="Delete user and all their scans and history?")
+@click.confirmation_option(prompt="Soft-delete user and their scans? (history kept for 180 days)")
 def delete_user(user_id: int):
-    """Delete a user and all associated scans and run history."""
+    """Soft-delete a user and all their scans. History is retained for 180 days."""
     factory, _ = get_factory()
+    now = datetime.now(timezone.utc)
     with get_db(factory) as db:
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
         if not user:
             click.echo(f"User {user_id} not found.")
             return
-        db.delete(user)
-    click.echo(f"User {user_id} deleted.")
+        user.deleted_at = now
+        db.query(Scan).filter(
+            Scan.user_id == user_id, Scan.deleted_at.is_(None)
+        ).update({"deleted_at": now})
+    click.echo(f"User {user_id} deleted (history retained for {_RETENTION_DAYS} days).")
 
 
 if __name__ == "__main__":

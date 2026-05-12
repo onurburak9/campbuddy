@@ -49,6 +49,9 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     scans: Mapped[list["Scan"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
