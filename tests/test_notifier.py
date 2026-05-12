@@ -374,5 +374,6 @@ def test_notify_digest_email_failure_does_not_block_telegram(mocker):
     scan.notify_via_telegram = True
     scan.user.email = "u@example.com"
     scan.user.telegram_chat_id = "123"
-    notify_digest(scan, [make_payload_at()], make_settings())
-    mock_tg.assert_called_once()
+    settings = make_settings()
+    notify_digest(scan, [make_payload_at()], settings)
+    mock_tg.assert_called_once_with("123", [make_payload_at()], settings)
