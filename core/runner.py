@@ -128,13 +128,9 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                 )
 
                 if cart_added:
-                    try:
-                        notify(scan, payload, settings)
-                        result.notified = True
-                        result.notified_at = _now()
-                    except Exception as e:
-                        logger.error("Urgent notify failed for scan %d, falling back to digest: %s", scan_id, e)
-                        digest_batch.append((result, payload))
+                    notify(scan, payload, settings)
+                    result.notified = True
+                    result.notified_at = _now()
                 else:
                     digest_batch.append((result, payload))
 
@@ -148,8 +144,6 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     r.notified_at = now
             except Exception as e:
                 logger.error("Digest notify failed for scan %d: %s", scan_id, e)
-        else:
-            notify_digest(scan, [], settings)
 
         # Transaction 4 (fast): finalize run
         with get_db(session_factory) as db:

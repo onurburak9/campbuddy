@@ -85,14 +85,12 @@ def test_run_saves_result_notifies_and_marks_cart(factory, scan_id, settings, mo
     mocker.patch("core.runner.attempt_cart_add", return_value=True)
     mocker.patch("core.runner.decrypt_password", return_value="plaintext")
     mock_notify = mocker.patch("core.runner.notify")
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
     run_scan(scan_id, factory, settings)
     with factory() as db:
         result = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
         assert result.cart_added is True
         assert result.notified is True
     mock_notify.assert_called_once()
-    mock_notify_digest.assert_called_once_with(mocker.ANY, [], mocker.ANY)
 
 
 def test_dedup_skips_same_site_same_date(factory, scan_id, settings, mocker):
@@ -103,7 +101,7 @@ def test_dedup_skips_same_site_same_date(factory, scan_id, settings, mocker):
     run_scan(scan_id, factory, settings)
     run_scan(scan_id, factory, settings)
     assert mock_notify.call_count == 0
-    assert mock_notify_digest.call_count == 2  # called each run, empty on 2nd
+    assert mock_notify_digest.call_count == 1  # only on first run; second run digest_batch is empty
 
 
 def test_run_skips_deleted_scan(factory, scan_id, settings, mocker):
@@ -130,6 +128,8 @@ def test_dedup_notifies_same_site_different_date(factory, scan_id, settings, moc
     run_scan(scan_id, factory, settings)
     assert mock_notify.call_count == 0
     assert mock_notify_digest.call_count == 2  # once per run, each with 1 payload
+    second_call_payloads = mock_notify_digest.call_args_list[1].args[1]
+    assert len(second_call_payloads) == 1
 
 
 def test_non_carted_site_routes_to_digest(factory, scan_id, settings, mocker):
@@ -162,18 +162,6 @@ def test_mixed_carted_and_non_carted_split_routing(factory, scan_id, settings, m
     assert len(digest_payloads) == 1
     assert digest_payloads[0].cart_added is False
 
-
-def test_urgent_failure_falls_back_to_digest(factory, scan_id, settings, mocker):
-    mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=True)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify", side_effect=RuntimeError("SMTP down"))
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
-    run_scan(scan_id, factory, settings)
-    mock_notify_digest.assert_called_once()
-    fallback_payloads = mock_notify_digest.call_args[0][1]
-    assert len(fallback_payloads) == 1
-    assert fallback_payloads[0].cart_added is True
 
 
 def test_digest_send_marks_all_results_notified(factory, scan_id, settings, mocker):
