@@ -1,3 +1,4 @@
+alembic==1.13.1
 camply==0.34.1
 pydantic==1.10.22  # camply requires pydantic v1; BaseSettings is built-in (pydantic.BaseSettings)
 sqlalchemy==2.0.30
