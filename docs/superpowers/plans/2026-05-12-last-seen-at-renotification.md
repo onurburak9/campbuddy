@@ -253,7 +253,7 @@ git commit -m "feat: add migrate_db to backfill last_seen_at on existing databas
 
 Two changes to the runner:
 1. **Transaction 1** — fetch the last completed `ScanRun` for this scan (before the current run) and extract its `started_at` as a plain datetime.
-2. **Transaction 2** — upsert: update `last_seen_at` if row exists, create if not. When `notify_on_new_only=True` and `old_last_seen >= prev_run_started_at`, the site was continuously available — commit the `last_seen_at` update but skip notification.
+2. **Transaction 2** — upsert: update `last_seen_at` if row exists, create if not. When `notify_on_new_only=True` and `old_last_seen >= prev_run_started_at`, the site was continuously available — commit the `last_seen_at` update but skip notification. Each path emits an INFO log: "continuously available — skipping", "returned after absence — re-notifying", or "new site — notifying".
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -374,7 +374,9 @@ Replace the entire Transaction 2 block (the `with get_db` that currently checks 
                     result_id = existing.id
                     if scan.notify_on_new_only:
                         if prev_run_started_at and old_last_seen >= prev_run_started_at:
+                            logger.info("Scan %d: %s %s continuously available — skipping", scan_id, site.facility_name, booking_date)
                             continue
+                        logger.info("Scan %d: %s %s returned after absence — re-notifying", scan_id, site.facility_name, booking_date)
                 else:
                     result = ScanResult(
                         scan_run_id=run_id,
@@ -392,6 +394,7 @@ Replace the entire Transaction 2 block (the `with get_db` that currently checks 
                     db.add(result)
                     db.flush()
                     result_id = result.id
+                    logger.info("Scan %d: new site %s %s — notifying", scan_id, site.facility_name, booking_date)
 ```
 
 Note: `continue` inside the `with` block is safe — Python exits the context manager cleanly (committing the `last_seen_at` update) before moving to the next loop iteration.
@@ -432,6 +435,7 @@ git commit -m "feat: re-notify when campsite returns after absence using last_se
 | Absence detected via previous `ScanRun.started_at`, not a time threshold | Task 3 Steps 3–4 |
 | `last_seen_at` advances even when notification is skipped | Task 3 Step 4 — `continue` fires after the `with` block commits |
 | `notify_on_new_only=False` always notifies, unaffected | Task 3 Step 4 — absence detection is guarded by `if scan.notify_on_new_only` |
+| INFO log on every skip/notify decision | Task 3 Step 4 — three log paths: continuously available, returned after absence, new site |
 | Existing databases migrated with backfill | Task 2 |
 | Migration is idempotent | Task 2 Step 1 (`test_migrate_db_is_idempotent`) |
 

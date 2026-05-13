@@ -76,6 +76,7 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                         .first()
                     )
                     if exists:
+                        logger.info("Scan %d: %s %s already seen — skipping", scan_id, site.facility_name, booking_date)
                         continue
                 result = ScanResult(
                     scan_run_id=run_id,
