@@ -51,7 +51,7 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         return
 
     try:
-        digest_batch: list[tuple[ScanResult, NotificationPayload]] = []
+        digest_batch: list[tuple[int, NotificationPayload]] = []
 
         for site in sites:
             booking_date = (
@@ -132,16 +132,18 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     result.notified = True
                     result.notified_at = _now()
                 else:
-                    digest_batch.append((result, payload))
+                    digest_batch.append((result_id, payload))
 
         if digest_batch:
             digest_payloads = [p for _, p in digest_batch]
             try:
                 notify_digest(scan, digest_payloads, settings)
                 now = _now()
-                for r, _ in digest_batch:
-                    r.notified = True
-                    r.notified_at = now
+                result_ids = [rid for rid, _ in digest_batch]
+                with get_db(session_factory) as db:
+                    db.query(ScanResult).filter(ScanResult.id.in_(result_ids)).update(
+                        {"notified": True, "notified_at": now}, synchronize_session=False
+                    )
             except Exception as e:
                 logger.error("Digest notify failed for scan %d: %s", scan_id, e)
 
