@@ -77,6 +77,13 @@ for s in sites:
 
 ### 3. Test notifications (Notifications — M3)
 
+CampBuddy delivers two kinds of notifications:
+
+- **Urgent** — one immediate email/Telegram per cart-add success. The Recreation.gov cart hold is ~15 minutes; act quickly.
+- **Digest** — one summary per scan run listing every available site that was *not* auto-carted (book manually). Sent once at the end of each run.
+
+`python cli.py test-notify <scan_id>` sends a test notification using the urgent format.
+
 First, ensure your `.env` has valid SMTP credentials. Then:
 
 ```bash
