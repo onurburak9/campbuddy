@@ -74,3 +74,22 @@ def test_update_user_rejects_deleted_user(runner, factory):
         db.commit()
     result = runner.invoke(cli, ["update-user", str(user_id), "--email", "new@e.com"])
     assert "not found" in result.output
+
+
+def test_update_user_sets_hashed_password(runner, factory):
+    user_id = _seed_user(factory)
+    result = runner.invoke(cli, ["update-user", str(user_id), "--password", "pass123"])
+    assert result.exit_code == 0
+    with factory() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        assert user.hashed_password is not None
+        assert user.hashed_password != "pass123"  # must be hashed
+
+
+def test_update_user_sets_scan_limit(runner, factory):
+    user_id = _seed_user(factory)
+    result = runner.invoke(cli, ["update-user", str(user_id), "--scan-limit", "3"])
+    assert result.exit_code == 0
+    with factory() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        assert user.scan_limit == 3

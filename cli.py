@@ -231,8 +231,11 @@ def test_cart(scan_id: int, booking_url: str, check_in: str, check_out: str):
 @click.option("--recreationgov-password", default=None, help="Recreation.gov password (will be encrypted).")
 @click.option("--clear-password", is_flag=True, help="Remove stored Recreation.gov password.")
 @click.option("--telegram-chat-id", default=None, help="Telegram chat ID.")
-def update_user(user_id, email, recreationgov_email, recreationgov_password, clear_password, telegram_chat_id):
+@click.option("--password", default=None, help="Web UI login password (will be hashed).")
+@click.option("--scan-limit", default=None, type=int, help="Maximum number of active scans.")
+def update_user(user_id, email, recreationgov_email, recreationgov_password, clear_password, telegram_chat_id, password, scan_limit):
     """Update fields on a user row."""
+    import bcrypt
     factory, settings = get_factory()
     with get_db(factory) as db:
         user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
@@ -249,9 +252,14 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
             user.recreationgov_password = None
         if telegram_chat_id:
             user.telegram_chat_id = telegram_chat_id
+        if password:
+            user.hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        if scan_limit is not None:
+            user.scan_limit = scan_limit
         click.echo(f"User {user_id} updated: email={user.email} rec_email={user.recreationgov_email} "
                    f"password={'set' if user.recreationgov_password else 'none'} "
-                   f"telegram={user.telegram_chat_id}")
+                   f"telegram={user.telegram_chat_id} "
+                   f"scan_limit={user.scan_limit}")
 
 
 @cli.command("delete-user")
