@@ -52,6 +52,8 @@ class User(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    hashed_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    scan_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
 
     scans: Mapped[list["Scan"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
