@@ -16,6 +16,7 @@ def env(monkeypatch):
     monkeypatch.setenv("SMTP_USER", "test@example.com")
     monkeypatch.setenv("SMTP_PASSWORD", "secret")
     monkeypatch.setenv("SMTP_FROM", "test@example.com")
+    monkeypatch.setenv("API_SECRET_KEY", "test-secret-key")
     return monkeypatch
 
 
@@ -56,3 +57,13 @@ def test_get_settings_cached(env):
     a = get_settings()
     b = get_settings()
     assert a is b
+
+
+def test_api_secret_key_loaded_from_env(monkeypatch):
+    monkeypatch.setenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("SMTP_USER", "u@e.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "pw")
+    monkeypatch.setenv("SMTP_FROM", "u@e.com")
+    monkeypatch.setenv("API_SECRET_KEY", "my-secret")
+    s = Settings(_env_file=None)
+    assert s.api_secret_key == "my-secret"
