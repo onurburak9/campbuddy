@@ -52,3 +52,20 @@ def test_patch_profile_ignores_scan_limit(auth_client):
     with get_db(api_db.get_factory()) as db:
         user = db.query(User).filter(User.id == info["id"]).first()
         assert user.scan_limit == 5  # unchanged from seed
+
+
+def test_patch_profile_returns_404_when_service_raises_notfound(auth_client, monkeypatch):
+    """Defensive: if update_profile raises NotFound (unreachable today due to
+    get_current_user filtering, but a future hard-delete codepath would trigger it),
+    the route returns 404, not 500."""
+    from core.services.exceptions import NotFound
+    from api.routes import users as users_route
+    client, _ = auth_client
+    monkeypatch.setattr(
+        users_route,
+        "update_profile",
+        lambda *a, **kw: (_ for _ in ()).throw(NotFound("forced for test")),
+    )
+    resp = client.patch("/api/v1/users/me", json={"email": "x@e.com"})
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "User not found"

@@ -19,4 +19,6 @@ def patch_profile(
     try:
         return update_profile(db, user.id, body.dict(exclude_unset=True), settings.encryption_key)
     except NotFound:
+        # defensive: get_current_user already filters deleted users, so this is only
+        # reachable on race-conditions or future hard-delete logic
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
