@@ -27,6 +27,8 @@ def get_scan(db, scan_id: int, user_id: int) -> Scan:
 
 def create_scan(db, user_id: int, data: dict) -> Scan:
     user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFound(f"User {user_id} not found")
     active_count = (
         db.query(Scan)
         .filter(Scan.user_id == user_id, Scan.deleted_at.is_(None))

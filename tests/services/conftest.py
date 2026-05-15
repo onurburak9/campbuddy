@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from db.models import Base, User
-from db.session import make_session_factory, get_db
+from db.session import make_session_factory
 
 
 @pytest.fixture

@@ -53,6 +53,17 @@ def test_get_scan_raises_forbidden_for_wrong_owner(db):
         get_scan(db, scan.id, u2.id)
 
 
+def test_get_scan_raises_not_found_for_soft_deleted(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    scan.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    with pytest.raises(NotFound):
+        get_scan(db, scan.id, u.id)
+
+
 def test_create_scan_returns_scan(db):
     u = make_user(db, scan_limit=5)
     data = {"search_windows": WINDOWS, "nights": 2}
@@ -70,6 +81,11 @@ def test_create_scan_raises_limit_exceeded(db):
     db.flush()
     with pytest.raises(LimitExceeded):
         create_scan(db, u.id, {"search_windows": WINDOWS})
+
+
+def test_create_scan_raises_not_found_for_missing_user(db):
+    with pytest.raises(NotFound):
+        create_scan(db, 9999, {"search_windows": WINDOWS})
 
 
 def test_create_scan_soft_deleted_not_counted_against_limit(db):
