@@ -42,3 +42,25 @@ def test_scans_used_counts_only_active(db):
     db.add_all([s1, s2, s3])
     db.flush()
     assert scans_used(db, u.id) == 2
+
+
+def test_update_profile_raises_not_found_for_missing_user(db):
+    with pytest.raises(NotFound):
+        update_profile(db, 9999, {"email": "x@e.com"}, ENCRYPTION_KEY)
+
+
+def test_update_profile_ignores_disallowed_fields(db):
+    u = make_user(db, scan_limit=5)
+    result = update_profile(db, u.id, {"scan_limit": 99, "id": 9999, "email": "new@e.com"}, ENCRYPTION_KEY)
+    assert result.email == "new@e.com"
+    assert result.scan_limit == 5
+    assert result.id == u.id
+
+
+def test_get_user_by_email_excludes_soft_deleted(db):
+    from datetime import datetime, timezone
+    u = make_user(db, "softdel@e.com")
+    u.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    with pytest.raises(NotFound):
+        get_user_by_email(db, "softdel@e.com")

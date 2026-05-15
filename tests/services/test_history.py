@@ -82,3 +82,27 @@ def test_list_results_returns_results_for_scan(db):
     _make_result(db, scan.id, run.id)
     results = list_results(db, scan.id, u.id, page=1, page_size=10)
     assert len(results) == 1
+
+
+def test_list_results_raises_forbidden_for_wrong_owner(db):
+    u1 = make_user(db, "a@e.com")
+    u2 = make_user(db, "b@e.com")
+    scan = Scan(user_id=u1.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(Forbidden):
+        list_results(db, scan.id, u2.id)
+
+
+def test_list_results_paginates(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    run = _make_run(db, scan.id)
+    for i in range(5):
+        _make_result(db, scan.id, run.id)
+    page1 = list_results(db, scan.id, u.id, page=1, page_size=3)
+    page2 = list_results(db, scan.id, u.id, page=2, page_size=3)
+    assert len(page1) == 3
+    assert len(page2) == 2
