@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List
 from api.deps import get_db_dep, get_current_user
@@ -22,7 +22,10 @@ def _scan_errors(exc):
 
 @router.get("", response_model=List[ScanResponse])
 def list_scans(db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
-    return scans_svc.list_scans(db, user.id)
+    try:
+        return scans_svc.list_scans(db, user.id)
+    except Exception as exc:
+        _scan_errors(exc)
 
 
 @router.post("", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
@@ -74,8 +77,13 @@ def resume_scan(scan_id: int, db: Session = Depends(get_db_dep), user=Depends(ge
 
 
 @router.get("/{scan_id}/runs", response_model=List[ScanRunResponse])
-def list_runs(scan_id: int, page: int = 1, page_size: int = 20,
-              db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
+def list_runs(
+    scan_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
     try:
         return history_svc.list_runs(db, scan_id, user.id, page=page, page_size=page_size)
     except Exception as exc:
@@ -83,8 +91,13 @@ def list_runs(scan_id: int, page: int = 1, page_size: int = 20,
 
 
 @router.get("/{scan_id}/results", response_model=List[ScanResultResponse])
-def list_results(scan_id: int, page: int = 1, page_size: int = 20,
-                 db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
+def list_results(
+    scan_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
     try:
         return history_svc.list_results(db, scan_id, user.id, page=page, page_size=page_size)
     except Exception as exc:

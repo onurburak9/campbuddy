@@ -75,6 +75,17 @@ def test_update_scan_changes_nights(auth_client):
     assert resp.json()["nights"] == 4
 
 
+def test_patch_scan_ignores_status_field(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    # status is not in ScanUpdate schema, so pydantic strips it.
+    # Scan should remain "active".
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"status": "paused", "nights": 5})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "active"  # status unchanged
+    assert resp.json()["nights"] == 5         # other fields still update
+
+
 def test_delete_scan_soft_deletes(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
@@ -117,13 +128,26 @@ def test_list_results_returns_empty(auth_client):
 
 
 def test_all_scan_routes_require_auth(client):
-    for method, path in [
-        ("GET", "/api/v1/scans"),
-        ("POST", "/api/v1/scans"),
-        ("GET", "/api/v1/scans/1"),
-        ("PATCH", "/api/v1/scans/1"),
-        ("DELETE", "/api/v1/scans/1"),
+    # GET routes — no json body
+    for path in [
+        "/api/v1/scans",
+        "/api/v1/scans/1",
+        "/api/v1/scans/1/runs",
+        "/api/v1/scans/1/results",
     ]:
-        fn = getattr(client, method.lower())
-        resp = fn(path, json={}) if method in ("POST", "PATCH") else fn(path)
-        assert resp.status_code == 401, f"{method} {path} should return 401"
+        resp = client.get(path)
+        assert resp.status_code == 401, f"GET {path} should return 401"
+    # State-mutating routes — json body where appropriate
+    for path in ["/api/v1/scans"]:
+        resp = client.post(path, json={"search_windows": WINDOWS})
+        assert resp.status_code == 401, f"POST {path} should return 401"
+    for path in [
+        "/api/v1/scans/1/pause",
+        "/api/v1/scans/1/resume",
+    ]:
+        resp = client.post(path)
+        assert resp.status_code == 401, f"POST {path} should return 401"
+    resp = client.patch("/api/v1/scans/1", json={"nights": 2})
+    assert resp.status_code == 401, "PATCH /api/v1/scans/1 should return 401"
+    resp = client.delete("/api/v1/scans/1")
+    assert resp.status_code == 401, "DELETE /api/v1/scans/1 should return 401"
