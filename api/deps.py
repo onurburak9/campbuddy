@@ -9,21 +9,36 @@ from db.session import get_db
 
 
 def get_db_dep():
-    with get_db(get_factory()) as db:
+    factory = get_factory()
+    if factory is None:
+        raise RuntimeError("api.database.init() was not called before serving requests")
+    with get_db(factory) as db:
         yield db
 
 
 def get_current_user(
     db: Session = Depends(get_db_dep),
-    campbuddy_session: Optional[str] = Cookie(default=None),
+    session_cookie: Optional[str] = Cookie(default=None, alias=COOKIE_NAME),
 ) -> User:
-    if not campbuddy_session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    if not session_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Cookie"},
+        )
     settings = get_settings()
-    user_id = decode_token(campbuddy_session, settings.api_secret_key)
+    user_id = decode_token(session_cookie, settings.api_secret_key)
     if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session",
+            headers={"WWW-Authenticate": "Cookie"},
+        )
     user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Cookie"},
+        )
     return user
