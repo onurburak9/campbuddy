@@ -31,7 +31,7 @@ def list_scans(db: Session = Depends(get_db_dep), user=Depends(get_current_user)
 @router.post("", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
 def create_scan(body: ScanCreate, db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
     try:
-        return scans_svc.create_scan(db, user.id, body.dict(exclude_unset=False))
+        return scans_svc.create_scan(db, user.id, body.dict(exclude_unset=True))
     except Exception as exc:
         _scan_errors(exc)
 
