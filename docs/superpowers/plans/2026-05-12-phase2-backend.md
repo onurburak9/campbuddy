@@ -6,7 +6,7 @@
 
 **Architecture:** One Docker image (`app` + `api` containers, different entry points) sharing a SQLite volume. A new `core/services/` layer holds all business logic, imported by both the API routes and the existing CLI. FastAPI sits in `api/`, wired up with session-cookie JWT auth and per-user scan limits.
 
-**Tech Stack:** FastAPI, uvicorn, passlib[bcrypt], python-jose[cryptography], python-multipart, pydantic v1 (already pinned), SQLAlchemy 2 (already present), pytest + FastAPI TestClient.
+**Tech Stack:** FastAPI, uvicorn, bcrypt, python-jose[cryptography], python-multipart, pydantic v1 (already pinned), SQLAlchemy 2 (already present), pytest + FastAPI TestClient.
 
 > **Note:** The React frontend is a separate follow-on plan (`2026-05-12-phase2-frontend.md`). This plan produces a fully tested, Dockerised API that the frontend can target.
 
@@ -911,22 +911,20 @@ def get_factory():
 ```python
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 
 ALGORITHM = "HS256"
 EXPIRE_HOURS = 24
 COOKIE_NAME = "campbuddy_session"
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def create_token(user_id: int, secret_key: str) -> str:

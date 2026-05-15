@@ -77,13 +77,14 @@ def test_update_user_rejects_deleted_user(runner, factory):
 
 
 def test_update_user_sets_hashed_password(runner, factory):
+    import bcrypt
     user_id = _seed_user(factory)
-    result = runner.invoke(cli, ["update-user", str(user_id), "--password", "pass123"])
+    result = runner.invoke(cli, ["update-user", str(user_id), "--password", "hunter2"])
     assert result.exit_code == 0
     with factory() as db:
         user = db.query(User).filter(User.id == user_id).first()
         assert user.hashed_password is not None
-        assert user.hashed_password != "pass123"  # must be hashed
+        assert bcrypt.checkpw(b"hunter2", user.hashed_password.encode())
 
 
 def test_update_user_sets_scan_limit(runner, factory):
