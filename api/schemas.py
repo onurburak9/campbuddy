@@ -108,3 +108,14 @@ class ProfileUpdate(BaseModel):
     telegram_chat_id: Optional[str] = None
     recreationgov_email: Optional[str] = None
     recreationgov_password: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    id: int
+    email: str
+    telegram_chat_id: Optional[str]
+    recreationgov_email: Optional[str]
+    scan_limit: int
+
+    class Config:
+        orm_mode = True
