@@ -11,7 +11,7 @@ def get_user_by_email(db, email: str) -> User:
 
 
 def update_profile(db, user_id: int, data: dict, encryption_key: str) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
     if not user:
         raise NotFound(f"User {user_id} not found")
     allowed = {"email", "telegram_chat_id", "recreationgov_email", "recreationgov_password"}

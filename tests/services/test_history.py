@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, date, timezone
 from db.models import Scan, ScanRun, ScanResult, ScanOutcome
 from core.services.history import list_runs, list_results
-from core.services.exceptions import Forbidden
+from core.services.exceptions import Forbidden, NotFound
 from tests.services.conftest import make_user
 
 WINDOWS = [{"start_date": "2026-07-03", "end_date": "2026-07-06"}]
@@ -106,3 +106,15 @@ def test_list_results_paginates(db):
     page2 = list_results(db, scan.id, u.id, page=2, page_size=3)
     assert len(page1) == 3
     assert len(page2) == 2
+
+
+def test_list_runs_raises_not_found_for_missing_scan(db):
+    u = make_user(db)
+    with pytest.raises(NotFound):
+        list_runs(db, 9999, u.id)
+
+
+def test_list_results_raises_not_found_for_missing_scan(db):
+    u = make_user(db)
+    with pytest.raises(NotFound):
+        list_results(db, 9999, u.id)
