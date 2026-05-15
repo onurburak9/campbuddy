@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
-from api.auth import verify_password, create_token, COOKIE_NAME
+from api.auth import verify_password, create_token, hash_password, COOKIE_NAME
 from api.deps import get_db_dep, get_current_user
 from api.schemas import LoginRequest, MeResponse
 from config.settings import get_settings
@@ -9,14 +9,19 @@ from core.services.exceptions import NotFound
 
 router = APIRouter()
 
+_DUMMY_HASH = hash_password("dummy-password-for-timing-equalization")
+
 
 @router.post("/login")
 def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_dep)):
     try:
         user = get_user_by_email(db, body.email)
+        hashed = user.hashed_password or _DUMMY_HASH
     except NotFound:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    if not user.hashed_password or not verify_password(body.password, user.hashed_password):
+        user = None
+        hashed = _DUMMY_HASH
+    valid_password = verify_password(body.password, hashed)
+    if user is None or not user.hashed_password or not valid_password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     settings = get_settings()
     token = create_token(user.id, settings.api_secret_key)
@@ -25,6 +30,7 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_d
         value=token,
         httponly=True,
         samesite="lax",
+        secure=settings.cookie_secure,
         max_age=86400,
     )
     return {"ok": True}

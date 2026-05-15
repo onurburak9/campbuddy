@@ -31,8 +31,10 @@ def test_login_user_with_no_password_returns_401(client):
 
 def test_logout_clears_cookie(client, user_in_db):
     client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+    assert "campbuddy_session" in client.cookies
     resp = client.post("/api/v1/auth/logout")
     assert resp.status_code == 200
+    assert "campbuddy_session" not in client.cookies
 
 
 def test_me_returns_user_info(auth_client):
@@ -48,3 +50,16 @@ def test_me_returns_user_info(auth_client):
 def test_me_returns_401_without_cookie(client):
     resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
+
+
+def test_login_unknown_email_runs_password_check(client):
+    """Defensive: unknown emails should still go through password verification to avoid timing oracle."""
+    import time
+    # warm up
+    client.post("/api/v1/auth/login", json={"email": "x@e.com", "password": "p"})
+    start = time.perf_counter()
+    resp = client.post("/api/v1/auth/login", json={"email": "still-unknown@e.com", "password": "anything"})
+    elapsed = time.perf_counter() - start
+    assert resp.status_code == 401
+    # bcrypt verify is intentionally slow (~50ms+). If <5ms, we're short-circuiting and leaking timing.
+    assert elapsed > 0.005, f"Login was too fast ({elapsed*1000:.1f}ms) — possible timing leak"
