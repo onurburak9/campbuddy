@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     playwright_service_url: str = "http://playwright:8001"
     database_url: str = "sqlite:///./data/campbuddy.db"
-    api_secret_key: str
+    api_secret_key: str = ""
     cookie_secure: bool = False
 
     class Config:
