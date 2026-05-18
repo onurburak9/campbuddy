@@ -60,6 +60,7 @@ config/         — settings (pydantic v1 BaseSettings) and scans.yaml
 playwright_service/ — isolated Playwright FastAPI sidecar
 tests/          — mirrors core/ and db/ structure
 docs/adr/       — architecture decision records
+docs/agents/    — agent task guides (read when doing specific kinds of work)
 docs/superpowers/ — design specs and implementation plans
 cli.py          — CLI entry point (click)
 main.py         — scheduler entry point
@@ -79,29 +80,12 @@ main.py         — scheduler entry point
 | `PLAYWRIGHT_SERVICE_URL` | no | Internal URL of Playwright sidecar (default: http://playwright:8001) |
 | `DATABASE_URL` | no | SQLite path (default: sqlite:///./data/campbuddy.db) |
 
-## Testing Conventions
+## Agent rules
 
-- Use `pytest` + `pytest-mock` (already in requirements)
-- Mock all external I/O: camply, httpx, smtplib, requests (Telegram)
-- Use in-memory SQLite for all DB tests (`sqlite:///:memory:`)
-- No test may make real network calls
-- Tests live in `tests/` mirroring `core/` and `db/`
-- Always run with the venv: `.venv/bin/pytest` or activate first
-
-## Code Conventions
-
-- No comments unless the WHY is non-obvious (a constraint, a workaround, a surprising invariant)
-- No docstrings on obvious functions
-- DB session always via `get_db()` context manager — never share a Session across threads
-- Each file has one responsibility — if it grows past ~150 lines, consider splitting
-- Timezone-aware datetimes everywhere (`datetime.now(timezone.utc)`, never `datetime.utcnow()`)
-
-## Adding a New Campground Provider
-
-1. Find the camply search class (e.g. `SearchReserveCalifornia`) in `camply.search`
-2. Add it to `PROVIDER_MAP` in `core/availability.py`
-3. Add a test in `tests/test_availability.py` asserting the new provider name routes correctly
-4. Update the provider table in `ARCHITECTURE.md`
+- Always add tests for new behaviour; mock all external I/O (camply, httpx, smtplib, Telegram) and use in-memory SQLite — see [Testing Guide](docs/agents/testing.md)
+- Follow naming, session, and datetime conventions — see [Code Conventions](docs/agents/code-conventions.md)
+- When changing `db/models.py`, always generate a migration in the same commit — see [Schema Changes](docs/agents/schema-changes.md)
+- When adding a new campground provider, follow the four-step checklist — see [Adding a Provider](docs/agents/adding-provider.md)
 
 ## Architecture
 

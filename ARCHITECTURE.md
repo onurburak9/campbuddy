@@ -42,7 +42,9 @@ Runs one background job per active scan, firing at each scan's `polling_interval
 Executes a single scan end-to-end:
 1. Calls availability checker
 2. Writes `scan_run` record (always, regardless of outcome)
-3. For each new site: saves result, calls booking sidecar, sends notifications
+3. For each new site: saves result, calls booking sidecar, then routes by urgency —
+   cart-add succeeded → immediate per-site notification; otherwise → buffered into
+   a per-run digest sent once after the loop
 
 ### Availability Checker (`core/availability.py`)
 Thin wrapper around camply's OO API. Converts a `Scan` DB record → `SearchRecreationDotGov` call → returns `list[AvailableCampsite]`. Provider class is looked up from `PROVIDER_MAP`.
@@ -51,7 +53,7 @@ Thin wrapper around camply's OO API. Converts a `Scan` DB record → `SearchRecr
 HTTP client (httpx) that POSTs to the Playwright sidecar's `/add-to-cart` endpoint. Returns `True`/`False`. Failures are non-fatal — user is always notified with the booking URL.
 
 ### Notifier (`core/notifier.py`)
-Dispatches email (smtplib/SMTP) and Telegram (Bot API via requests) based on per-scan preferences. Booking URL is always included in plain text.
+Two dispatch paths: `notify(scan, payload, settings)` for urgent single-site sends (cart-add success) and `notify_digest(scan, payloads, settings)` for batched multi-site summaries (everything else). Both honour per-scan `notify_via_email` and `notify_via_telegram` flags. Email uses smtplib/SMTP with UTF-8 MIMEText; Telegram uses the Bot API via `requests` with defensive truncation at 4000 chars. Booking URL always included in plain text.
 
 ### Playwright Sidecar (`playwright_service/`)
 Isolated FastAPI service in its own Docker container. Receives `POST /add-to-cart { booking_url, email, password, check_in, check_out }` (dates in `MM-DD-YYYY`), drives headless Chromium to log in and add the site to cart, returns `{ success, error }`. Runs separately so a browser crash cannot kill the scheduler.
@@ -147,3 +149,4 @@ SQLite database mounted at `./data/campbuddy.db`. Back up this file.
 - [ADR 003](docs/adr/003-sqlite-first.md) — SQLite for Phase 1
 - [ADR 004](docs/adr/004-notify-on-cart-failure.md) — Notify even when cart add fails
 - [ADR 005](docs/adr/005-pydantic-v1.md) — pydantic v1 (camply constraint)
+- [ADR 006](docs/adr/006-split-urgent-and-digest-notifications.md) — Split urgent and digest notifications

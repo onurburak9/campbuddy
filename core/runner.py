@@ -8,7 +8,7 @@ from db.session import get_db
 from core.availability import check_availability
 from core.booking import attempt_cart_add
 from core.crypto import decrypt_password
-from core.notifier import notify, NotificationPayload
+from core.notifier import notify, notify_digest, NotificationPayload
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,8 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         return
 
     try:
+        digest_batch: list[tuple[int, NotificationPayload]] = []
+
         for site in sites:
             booking_date = (
                 site.booking_date.date()
@@ -114,25 +116,36 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                 if cart_added:
                     result.cart_added_at = _now()
 
-            # Slow I/O: notify — no lock held
-            payload = NotificationPayload(
-                facility_name=site.facility_name,
-                site_name=site.campsite_site_name,
-                campsite_type=site.campsite_type,
-                booking_date=booking_date,
-                booking_end_date=booking_end_date,
-                booking_url=site.booking_url,
-                cart_added=cart_added,
-                nights=scan.nights,
-            )
-            try:
-                notify(scan, payload, settings)
-                with get_db(session_factory) as db:
-                    result = db.query(ScanResult).filter(ScanResult.id == result_id).first()
+                payload = NotificationPayload(
+                    facility_name=site.facility_name,
+                    site_name=site.campsite_site_name,
+                    campsite_type=site.campsite_type,
+                    booking_date=booking_date,
+                    booking_end_date=booking_end_date,
+                    booking_url=site.booking_url,
+                    cart_added=cart_added,
+                    nights=scan.nights,
+                )
+
+                if cart_added:
+                    notify(scan, payload, settings)
                     result.notified = True
                     result.notified_at = _now()
+                else:
+                    digest_batch.append((result_id, payload))
+
+        if digest_batch:
+            digest_payloads = [p for _, p in digest_batch]
+            try:
+                notify_digest(scan, digest_payloads, settings)
+                now = _now()
+                result_ids = [rid for rid, _ in digest_batch]
+                with get_db(session_factory) as db:
+                    db.query(ScanResult).filter(ScanResult.id.in_(result_ids)).update(
+                        {"notified": True, "notified_at": now}, synchronize_session=False
+                    )
             except Exception as e:
-                logger.error("Notify error for scan %d: %s", scan_id, e)
+                logger.error("Digest notify failed for scan %d: %s", scan_id, e)
 
         # Transaction 4 (fast): finalize run
         with get_db(session_factory) as db:
