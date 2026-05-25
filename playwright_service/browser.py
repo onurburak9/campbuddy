@@ -130,7 +130,6 @@ def add_to_cart(booking_url: str, email: str, password: str, check_in: str, chec
             page.wait_for_selector("h1", timeout=30_000)
             _jitter(1500, 2500)
 
-            # Dismiss outdated browser banner if present
             try:
                 page.click("button:has-text('Ignore')", timeout=2_000)
                 _jitter(300, 600)
@@ -157,4 +156,6 @@ def add_to_cart(booking_url: str, email: str, password: str, check_in: str, chec
             logger.error("Playwright error: %s", e)
             return {"success": False, "error": str(e)}
         finally:
+            page.close()
+            context.close()
             browser.close()
