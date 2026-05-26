@@ -2,35 +2,45 @@
 
 ## System Overview
 
-CampBuddy is a single-process Python service that monitors campground availability and automates the booking flow on behalf of users.
+CampBuddy monitors campground availability, automates booking, and exposes a REST API for users to manage their scans via browser.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                        VPS                              │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  app container                                   │  │
-│  │                                                  │  │
-│  │  ┌────────────┐    ┌─────────────┐               │  │
-│  │  │ APScheduler│───▶│   Runner    │               │  │
-│  │  │  (jobs)    │    │  (per scan) │               │  │
-│  │  └────────────┘    └──────┬──────┘               │  │
-│  │                           │                      │  │
-│  │              ┌────────────┼────────────┐         │  │
-│  │              ▼            ▼            ▼         │  │
-│  │        ┌──────────┐ ┌─────────┐ ┌──────────┐    │  │
-│  │        │ camply   │ │ Booking │ │ Notifier │    │  │
-│  │        │ (avail.) │ │ Client  │ │ (email + │    │  │
-│  │        └──────────┘ └────┬────┘ │ telegram)│    │  │
-│  │                          │      └──────────┘    │  │
-│  │        ┌─────────────────┘                      │  │
-│  │        ▼                                         │  │
-│  │  ┌──────────┐    SQLite                          │  │
-│  │  │Playwright│    campbuddy.db                    │  │
-│  │  │ sidecar  │    (mounted volume)                │  │
-│  │  └──────────┘                                   │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                            VPS                               │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  app container (scheduler)                          │    │
+│  │  ┌────────────┐    ┌─────────────┐                  │    │
+│  │  │ APScheduler│───▶│   Runner    │                  │    │
+│  │  │  (jobs)    │    │  (per scan) │                  │    │
+│  │  └────────────┘    └──────┬──────┘                  │    │
+│  │                           │                         │    │
+│  │              ┌────────────┼────────────┐            │    │
+│  │              ▼            ▼            ▼            │    │
+│  │        ┌──────────┐ ┌─────────┐ ┌──────────┐       │    │
+│  │        │ camply   │ │ Booking │ │ Notifier │       │    │
+│  │        │ (avail.) │ │ Client  │ │ (email + │       │    │
+│  │        └──────────┘ └────┬────┘ │ telegram)│       │    │
+│  │                          │      └──────────┘       │    │
+│  │        ┌─────────────────┘                         │    │
+│  │        ▼                                            │    │
+│  │  ┌──────────┐    SQLite                             │    │
+│  │  │Playwright│◀── campbuddy.db ──────────────────┐  │    │
+│  │  │ sidecar  │    (shared volume)                │  │    │
+│  │  └──────────┘                                   │  │    │
+│  └─────────────────────────────────────────────────│──┘    │
+│                                                    │        │
+│  ┌─────────────────────────────────────────────────│──┐    │
+│  │  api container  :8000 (localhost)               │  │    │
+│  │  ┌──────────────────────────────────────────┐   │  │    │
+│  │  │ FastAPI (uvicorn)                        │   │  │    │
+│  │  │  /api/v1/auth  /api/v1/scans  /api/v1/users│  │  │    │
+│  │  │  JWT cookie auth · scan CRUD · history   │   │  │    │
+│  │  └──────────────────────┬───────────────────┘   │  │    │
+│  │                         │  core/services/        │  │    │
+│  │                         └───────────────────────►┘  │    │
+│  └─────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Components
@@ -60,11 +70,22 @@ Isolated FastAPI service in its own Docker container. Receives `POST /add-to-car
 
 Bot-detection hardening: `playwright-stealth`, Chrome 136 user agent + matching `sec-ch-ua` headers, human-like typing delays, and jitter between actions. Dates are pre-selected by injecting `r1s_search_session` into `localStorage` before navigating to the campsite page — see [`docs/superpowers/recreation-gov-checkout-flow.md`](docs/superpowers/recreation-gov-checkout-flow.md) for the full site map.
 
+### Service Layer (`core/services/`)
+Shared business logic imported by both the API routes and the CLI. Three modules:
+- `scans.py` — scan CRUD, ownership check, soft-delete, pause/resume, per-user `scan_limit` enforcement
+- `users.py` — profile reads/updates, Recreation.gov credential encryption, `scans_used` count
+- `history.py` — paginated `ScanRun` and `ScanResult` queries (ownership-gated via `get_scan`)
+
+Domain exceptions (`NotFound`, `Forbidden`, `LimitExceeded`) live in `core/services/exceptions.py` and are translated to HTTP status codes at the route layer.
+
+### REST API (`api/`)
+FastAPI application served by uvicorn on port 8000 (localhost-only). Session-cookie JWT auth (`HS256`, 24 h TTL, `httponly`/`samesite=lax`). Routes: `POST /api/v1/auth/login`, `POST /auth/logout`, `GET /auth/me`, full scan CRUD + `/{id}/pause` + `/{id}/resume`, `GET /{id}/runs`, `GET /{id}/results`, `PATCH /api/v1/users/me`. Login is timing-safe: a dummy hash is evaluated even for unknown emails to prevent user enumeration.
+
 ### Crypto (`core/crypto.py`)
 Fernet (AES-128-CBC + HMAC) encrypt/decrypt for Recreation.gov passwords. Key lives in `ENCRYPTION_KEY` env var; validated at startup by `Settings`.
 
 ### Settings (`config/settings.py`)
-pydantic v1 `BaseSettings` (built-in to pydantic v1 — pydantic-settings package is intentionally NOT used because camply requires pydantic v1). Validates `ENCRYPTION_KEY` is a real Fernet key. Cached via `@lru_cache`.
+pydantic v1 `BaseSettings` (built-in to pydantic v1 — pydantic-settings package is intentionally NOT used because camply requires pydantic v1). Validates `ENCRYPTION_KEY` is a real Fernet key. Cached via `@lru_cache`. `api_secret_key` defaults to `""` and is validated non-empty in the API lifespan; the scheduler ignores it.
 
 ## Data Flow
 
@@ -92,16 +113,19 @@ Scheduler fires scan_id=N
 users
   id, email (unique), telegram_chat_id, recreationgov_email
   recreationgov_password (Fernet-encrypted, String(256))
-  created_at (timezone-aware)
+  hashed_password (bcrypt digest for Web UI login, nullable)
+  scan_limit (int, default 5 — max active scans per user)
+  created_at (timezone-aware), deleted_at (soft-delete, nullable)
 
 scans
-  id, user_id→users (indexed), provider, status (enum: active|paused|completed)
+  id, user_id→users (indexed), name (optional label), provider
+  status (enum: active|paused|completed)
   polling_interval
   rec_area_ids (JSON list[int]), campground_ids, campsite_ids
   search_windows (JSON list[dict]), nights
   days_of_week (JSON list[int]), weekends_only
   notify_via_email, notify_via_telegram, notify_on_new_only
-  created_at (timezone-aware)
+  created_at (timezone-aware), deleted_at (soft-delete, nullable)
 
 scan_runs                          ← always written, every execution
   id, scan_id→scans (indexed)
@@ -128,18 +152,19 @@ To add a provider: see "Adding a New Campground Provider" in CLAUDE.md.
 
 ## Deployment
 
-Two Docker containers, `docker-compose.yml`:
-- `app` — Python service (scheduler + runner + notifier)
+Three Docker containers, `docker-compose.yml`:
+- `app` — scheduler + runner + notifier; runs `alembic upgrade head` then `python main.py` via `entrypoint.sh`
+- `api` — FastAPI REST API; `uvicorn api.main:app` on `127.0.0.1:8000`; `depends_on: app` so migrations run first
 - `playwright` — Playwright sidecar (FastAPI, port 8001 internal only)
 
-SQLite database mounted at `./data/campbuddy.db`. Back up this file.
+SQLite database mounted at `./data/campbuddy.db`. Both `app` and `api` share this volume. Back up this file.
 
 ## Phased Roadmap
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 1 — Core engine | 🔨 In progress | This plan |
-| 2 — Web dashboard | Planned | FastAPI + HTMX, manage scans via browser |
+| 1 — Core engine | ✅ Done | Scheduler, runner, notifier, Playwright sidecar |
+| 2 — Web dashboard | 🔨 In progress | REST API (this PR) + React frontend (planned) |
 | 3 — Telegram bot | Planned | Create/manage scans via Telegram commands |
 
 ## Architecture Decision Records

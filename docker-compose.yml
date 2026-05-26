@@ -11,14 +11,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - app
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
   playwright:
     build:
       context: .
       dockerfile: playwright_service/Dockerfile
     expose:
       - "8001"
-    ports:
-      - "8001:8001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s

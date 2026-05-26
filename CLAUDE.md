@@ -54,11 +54,13 @@ docker compose down
 ## Directory Structure
 
 ```
+api/            — FastAPI REST API: routes, schemas, JWT auth, deps
 core/           — availability, booking, crypto, notifier, runner, scheduler
+core/services/  — shared business logic (scans, users, history, exceptions)
 db/             — SQLAlchemy models and session factory
 config/         — settings (pydantic v1 BaseSettings) and scans.yaml
 playwright_service/ — isolated Playwright FastAPI sidecar
-tests/          — mirrors core/ and db/ structure
+tests/          — mirrors core/, core/services/, api/, and db/ structure
 docs/adr/       — architecture decision records
 docs/agents/    — agent task guides (read when doing specific kinds of work)
 docs/superpowers/ — design specs and implementation plans
@@ -79,6 +81,8 @@ main.py         — scheduler entry point
 | `TELEGRAM_BOT_TOKEN` | no | Bot token from @BotFather; leave empty to disable |
 | `PLAYWRIGHT_SERVICE_URL` | no | Internal URL of Playwright sidecar (default: http://playwright:8001) |
 | `DATABASE_URL` | no | SQLite path (default: sqlite:///./data/campbuddy.db) |
+| `API_SECRET_KEY` | yes (api) | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `COOKIE_SECURE` | no | Set `true` when serving the API over HTTPS (default: false) |
 
 ## Agent rules
 

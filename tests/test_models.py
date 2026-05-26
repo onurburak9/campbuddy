@@ -248,3 +248,25 @@ def test_session_factory_get_db_rolls_back_on_exception():
             raise RuntimeError("simulated failure")
     with get_db(factory) as db:
         assert db.query(User).filter_by(email="rollback@example.com").first() is None
+
+
+def test_user_has_hashed_password_and_scan_limit(db):
+    user = User(email="authuser@example.com", hashed_password="somehash", scan_limit=3)
+    db.add(user)
+    db.commit()
+    assert user.hashed_password == "somehash"
+    assert user.scan_limit == 3
+
+
+def test_user_scan_limit_defaults_to_five(db):
+    user = User(email="defaultlimit@example.com")
+    db.add(user)
+    db.commit()
+    assert user.scan_limit == 5
+
+
+def test_user_hashed_password_nullable(db):
+    user = User(email="nopassword@example.com")
+    db.add(user)
+    db.commit()
+    assert user.hashed_password is None

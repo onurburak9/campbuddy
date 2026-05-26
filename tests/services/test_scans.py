@@ -1,0 +1,136 @@
+import pytest
+from datetime import datetime, timezone
+from db.models import Scan, ScanStatus
+from core.services.scans import (
+    list_scans,
+    get_scan,
+    create_scan,
+    update_scan,
+    delete_scan,
+    pause_scan,
+    resume_scan,
+)
+from core.services.exceptions import NotFound, Forbidden, LimitExceeded
+from tests.services.conftest import make_user
+
+
+WINDOWS = [{"start_date": "2026-07-03", "end_date": "2026-07-06"}]
+
+
+def test_list_scans_returns_only_owners_scans(db):
+    u1 = make_user(db, "a@e.com")
+    u2 = make_user(db, "b@e.com")
+    scan = Scan(user_id=u1.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    assert len(list_scans(db, u1.id)) == 1
+    assert len(list_scans(db, u2.id)) == 0
+
+
+def test_list_scans_excludes_soft_deleted(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    scan.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    assert list_scans(db, u.id) == []
+
+
+def test_get_scan_raises_not_found_for_missing(db):
+    u = make_user(db)
+    with pytest.raises(NotFound):
+        get_scan(db, 9999, u.id)
+
+
+def test_get_scan_raises_forbidden_for_wrong_owner(db):
+    u1 = make_user(db, "a@e.com")
+    u2 = make_user(db, "b@e.com")
+    scan = Scan(user_id=u1.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(Forbidden):
+        get_scan(db, scan.id, u2.id)
+
+
+def test_get_scan_raises_not_found_for_soft_deleted(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    scan.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    with pytest.raises(NotFound):
+        get_scan(db, scan.id, u.id)
+
+
+def test_create_scan_returns_scan(db):
+    u = make_user(db, scan_limit=5)
+    data = {"search_windows": WINDOWS, "nights": 2}
+    scan = create_scan(db, u.id, data)
+    assert scan.id is not None
+    assert scan.user_id == u.id
+    assert scan.nights == 2
+
+
+def test_create_scan_raises_limit_exceeded(db):
+    u = make_user(db, scan_limit=2)
+    for _ in range(2):
+        s = Scan(user_id=u.id, search_windows=WINDOWS)
+        db.add(s)
+    db.flush()
+    with pytest.raises(LimitExceeded):
+        create_scan(db, u.id, {"search_windows": WINDOWS})
+
+
+def test_create_scan_raises_not_found_for_missing_user(db):
+    with pytest.raises(NotFound):
+        create_scan(db, 9999, {"search_windows": WINDOWS})
+
+
+def test_create_scan_soft_deleted_not_counted_against_limit(db):
+    u = make_user(db, scan_limit=1)
+    s = Scan(user_id=u.id, search_windows=WINDOWS,
+             deleted_at=datetime.now(timezone.utc))
+    db.add(s)
+    db.flush()
+    scan = create_scan(db, u.id, {"search_windows": WINDOWS})
+    assert scan.id is not None
+
+
+def test_update_scan_changes_fields(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, nights=1)
+    db.add(scan)
+    db.flush()
+    updated = update_scan(db, scan.id, u.id, {"nights": 3, "name": "Yosemite"})
+    assert updated.nights == 3
+    assert updated.name == "Yosemite"
+
+
+def test_delete_scan_soft_deletes(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    delete_scan(db, scan.id, u.id)
+    db.flush()
+    assert scan.deleted_at is not None
+
+
+def test_pause_scan_sets_status(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.active)
+    db.add(scan)
+    db.flush()
+    result = pause_scan(db, scan.id, u.id)
+    assert result.status == ScanStatus.paused
+
+
+def test_resume_scan_sets_status(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.paused)
+    db.add(scan)
+    db.flush()
+    result = resume_scan(db, scan.id, u.id)
+    assert result.status == ScanStatus.active
