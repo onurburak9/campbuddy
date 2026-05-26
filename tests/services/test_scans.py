@@ -10,7 +10,7 @@ from core.services.scans import (
     pause_scan,
     resume_scan,
 )
-from core.services.exceptions import NotFound, Forbidden, LimitExceeded
+from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState
 from tests.services.conftest import make_user
 
 
@@ -43,13 +43,13 @@ def test_get_scan_raises_not_found_for_missing(db):
         get_scan(db, 9999, u.id)
 
 
-def test_get_scan_raises_forbidden_for_wrong_owner(db):
+def test_get_scan_raises_not_found_for_wrong_owner(db):
     u1 = make_user(db, "a@e.com")
     u2 = make_user(db, "b@e.com")
     scan = Scan(user_id=u1.id, search_windows=WINDOWS)
     db.add(scan)
     db.flush()
-    with pytest.raises(Forbidden):
+    with pytest.raises(NotFound):
         get_scan(db, scan.id, u2.id)
 
 
@@ -108,6 +108,18 @@ def test_update_scan_changes_fields(db):
     assert updated.name == "Yosemite"
 
 
+def test_update_scan_ignores_disallowed_fields(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    original_user_id = scan.user_id
+    update_scan(db, scan.id, u.id, {"user_id": 9999, "deleted_at": None, "status": "completed"})
+    assert scan.user_id == original_user_id
+    assert scan.deleted_at is None
+    assert scan.status == ScanStatus.active
+
+
 def test_delete_scan_soft_deletes(db):
     u = make_user(db)
     scan = Scan(user_id=u.id, search_windows=WINDOWS)
@@ -127,6 +139,24 @@ def test_pause_scan_sets_status(db):
     assert result.status == ScanStatus.paused
 
 
+def test_pause_already_paused_raises_invalid_state(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.paused)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(InvalidState):
+        pause_scan(db, scan.id, u.id)
+
+
+def test_pause_completed_scan_raises_invalid_state(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.completed)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(InvalidState):
+        pause_scan(db, scan.id, u.id)
+
+
 def test_resume_scan_sets_status(db):
     u = make_user(db)
     scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.paused)
@@ -134,3 +164,21 @@ def test_resume_scan_sets_status(db):
     db.flush()
     result = resume_scan(db, scan.id, u.id)
     assert result.status == ScanStatus.active
+
+
+def test_resume_active_scan_raises_invalid_state(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.active)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(InvalidState):
+        resume_scan(db, scan.id, u.id)
+
+
+def test_resume_completed_scan_raises_invalid_state(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.completed)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(InvalidState):
+        resume_scan(db, scan.id, u.id)

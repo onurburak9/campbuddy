@@ -1,3 +1,9 @@
+from db.models import User
+from db.session import get_db
+import api.database as api_db
+from api.auth import hash_password
+
+
 def test_patch_profile_updates_email(auth_client):
     client, _ = auth_client
     resp = client.patch("/api/v1/users/me", json={"email": "updated@example.com"})
@@ -16,9 +22,6 @@ def test_patch_profile_encrypts_recreationgov_password(auth_client):
     client, _ = auth_client
     resp = client.patch("/api/v1/users/me", json={"recreationgov_password": "s3cr3t"})
     assert resp.status_code == 200
-    from db.models import User
-    from db.session import get_db
-    import api.database as api_db
     with get_db(api_db.get_factory()) as db:
         user = db.query(User).filter(User.email == "user@example.com").first()
         assert user.recreationgov_password is not None
@@ -45,13 +48,9 @@ def test_patch_profile_ignores_scan_limit(auth_client):
     client, info = auth_client
     resp = client.patch("/api/v1/users/me", json={"scan_limit": 999, "email": "new@e.com"})
     assert resp.status_code == 200
-    # Verify scan_limit unchanged in DB
-    from db.models import User
-    from db.session import get_db
-    import api.database as api_db
     with get_db(api_db.get_factory()) as db:
         user = db.query(User).filter(User.id == info["id"]).first()
-        assert user.scan_limit == 5  # unchanged from seed
+        assert user.scan_limit == 5
 
 
 def test_patch_profile_returns_404_when_service_raises_notfound(auth_client, monkeypatch):
@@ -69,3 +68,14 @@ def test_patch_profile_returns_404_when_service_raises_notfound(auth_client, mon
     resp = client.patch("/api/v1/users/me", json={"email": "x@e.com"})
     assert resp.status_code == 404
     assert resp.json()["detail"] == "User not found"
+
+
+def test_patch_profile_duplicate_email_returns_409(auth_client):
+    """Changing email to one already in use must return 409, not 500."""
+    client, _ = auth_client
+    with get_db(api_db.get_factory()) as db:
+        other = User(email="taken@e.com", hashed_password=hash_password("pw"), scan_limit=5)
+        db.add(other)
+    resp = client.patch("/api/v1/users/me", json={"email": "taken@e.com"})
+    assert resp.status_code == 409
+    assert "already in use" in resp.json()["detail"]

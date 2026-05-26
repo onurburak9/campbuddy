@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from api.auth import verify_password, create_token, hash_password, COOKIE_NAME
@@ -6,6 +7,8 @@ from api.schemas import LoginRequest, MeResponse
 from config.settings import get_settings
 from core.services.users import get_user_by_email, scans_used
 from core.services.exceptions import NotFound
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,6 +25,7 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_d
         hashed = _DUMMY_HASH
     valid_password = verify_password(body.password, hashed)
     if user is None or not user.hashed_password or not valid_password:
+        logger.warning("Failed login attempt for email=%s", body.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     settings = get_settings()
     token = create_token(user.id, settings.api_secret_key)
@@ -38,7 +42,13 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_d
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(key=COOKIE_NAME)
+    settings = get_settings()
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+    )
     return {"ok": True}
 
 

@@ -148,12 +148,12 @@ def test_multi_user_scans_isolated(client):
     resp = client.get("/api/v1/scans")
     assert resp.json() == []
 
-    # Bob cannot read Alice's scan
-    assert client.get(f"/api/v1/scans/{a_sid}").status_code == 403
-    assert client.patch(f"/api/v1/scans/{a_sid}", json={"nights": 9}).status_code == 403
-    assert client.delete(f"/api/v1/scans/{a_sid}").status_code == 403
-    assert client.post(f"/api/v1/scans/{a_sid}/pause").status_code == 403
-    assert client.get(f"/api/v1/scans/{a_sid}/runs").status_code == 403
+    # Bob cannot read Alice's scan (returns 404 to prevent ID enumeration)
+    assert client.get(f"/api/v1/scans/{a_sid}").status_code == 404
+    assert client.patch(f"/api/v1/scans/{a_sid}", json={"nights": 9}).status_code == 404
+    assert client.delete(f"/api/v1/scans/{a_sid}").status_code == 404
+    assert client.post(f"/api/v1/scans/{a_sid}/pause").status_code == 404
+    assert client.get(f"/api/v1/scans/{a_sid}/runs").status_code == 404
 
 
 # -----------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, date, timezone
 from db.models import Scan, ScanRun, ScanResult, ScanOutcome
 from core.services.history import list_runs, list_results
-from core.services.exceptions import Forbidden, NotFound
+from core.services.exceptions import NotFound
 from tests.services.conftest import make_user
 
 WINDOWS = [{"start_date": "2026-07-03", "end_date": "2026-07-06"}]
@@ -56,7 +56,7 @@ def test_list_runs_raises_forbidden_for_wrong_owner(db):
     scan = Scan(user_id=u1.id, search_windows=WINDOWS)
     db.add(scan)
     db.flush()
-    with pytest.raises(Forbidden):
+    with pytest.raises(NotFound):
         list_runs(db, scan.id, u2.id)
 
 
@@ -90,7 +90,7 @@ def test_list_results_raises_forbidden_for_wrong_owner(db):
     scan = Scan(user_id=u1.id, search_windows=WINDOWS)
     db.add(scan)
     db.flush()
-    with pytest.raises(Forbidden):
+    with pytest.raises(NotFound):
         list_results(db, scan.id, u2.id)
 
 

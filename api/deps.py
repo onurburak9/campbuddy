@@ -38,7 +38,7 @@ def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Invalid or expired session",
             headers={"WWW-Authenticate": "Cookie"},
         )
     return user

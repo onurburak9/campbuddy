@@ -1,8 +1,10 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 from db.models import User
 import api.database as api_db
 from db.session import get_db
-from api.auth import hash_password
+from api.auth import hash_password, COOKIE_NAME, ALGORITHM
+from jose import jwt
 
 
 def test_login_sets_cookie(client, user_in_db):
@@ -27,6 +29,11 @@ def test_login_user_with_no_password_returns_401(client):
         db.add(user)
     resp = client.post("/api/v1/auth/login", json={"email": "nopass@example.com", "password": "anything"})
     assert resp.status_code == 401
+
+
+def test_login_empty_password_returns_422(client, user_in_db):
+    resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": ""})
+    assert resp.status_code == 422
 
 
 def test_logout_clears_cookie(client, user_in_db):
@@ -63,3 +70,46 @@ def test_login_unknown_email_runs_password_check(client):
     assert resp.status_code == 401
     # bcrypt verify is intentionally slow (~50ms+). If <5ms, we're short-circuiting and leaking timing.
     assert elapsed > 0.005, f"Login was too fast ({elapsed*1000:.1f}ms) — possible timing leak"
+
+
+def test_expired_jwt_returns_401(client, user_in_db):
+    """A token with exp in the past must be rejected."""
+    from config.settings import get_settings
+    settings = get_settings()
+    expired_token = jwt.encode(
+        {"sub": str(user_in_db["id"]), "exp": datetime.now(timezone.utc) - timedelta(hours=1), "iat": datetime.now(timezone.utc)},
+        settings.api_secret_key,
+        algorithm=ALGORITHM,
+    )
+    client.cookies.set(COOKIE_NAME, expired_token)
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 401
+
+
+def test_malformed_jwt_returns_401(client):
+    """Garbage cookie value must return 401, not 500."""
+    client.cookies.set(COOKIE_NAME, "not-a-jwt")
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 401
+
+
+def test_tampered_jwt_returns_401(client, user_in_db):
+    """A token signed with the wrong key must be rejected."""
+    tampered_token = jwt.encode(
+        {"sub": str(user_in_db["id"]), "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        "wrong-secret-key",
+        algorithm=ALGORITHM,
+    )
+    client.cookies.set(COOKIE_NAME, tampered_token)
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 401
+
+
+def test_soft_deleted_user_with_valid_jwt_returns_401(client, user_in_db):
+    """A valid token for a soft-deleted user must be rejected."""
+    client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+    with get_db(api_db.get_factory()) as db:
+        user = db.query(User).filter(User.id == user_in_db["id"]).first()
+        user.deleted_at = datetime.now(timezone.utc)
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 401

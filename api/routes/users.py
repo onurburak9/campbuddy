@@ -1,10 +1,14 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from api.deps import get_db_dep, get_current_user
 from api.schemas import ProfileUpdate, ProfileResponse
 from config.settings import get_settings
 from core.services.users import update_profile
 from core.services.exceptions import NotFound
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -19,6 +23,7 @@ def patch_profile(
     try:
         return update_profile(db, user.id, body.dict(exclude_unset=True), settings.encryption_key)
     except NotFound:
-        # defensive: get_current_user already filters deleted users, so this is only
-        # reachable on race-conditions or future hard-delete logic
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
