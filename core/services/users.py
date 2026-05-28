@@ -6,7 +6,7 @@ from core.crypto import encrypt_password
 def get_user_by_email(db, email: str) -> User:
     user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
     if not user:
-        raise NotFound(f"User {email} not found")
+        raise NotFound("User not found")
     return user
 
 

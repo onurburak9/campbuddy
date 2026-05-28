@@ -1,5 +1,5 @@
 import pytest
-from db.models import Scan, User
+from db.models import Scan, ScanStatus, User
 from db.session import get_db
 import api.database as api_db
 from api.auth import hash_password
@@ -41,6 +41,53 @@ def test_create_scan_enforces_limit(auth_client):
     assert resp.status_code == 409
 
 
+def test_create_scan_includes_defaults(auth_client):
+    """Create with only search_windows — defaults for polling_interval, nights, etc. are included."""
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["polling_interval"] == 300
+    assert data["nights"] == 1
+    assert data["provider"] == "RecreationDotGov"
+
+
+def test_create_scan_rejects_invalid_provider(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "provider": "FakeProvider"})
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_low_polling_interval(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "polling_interval": 10})
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_zero_nights(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "nights": 0})
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_invalid_search_window(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": [{"start_date": "2026-07-06", "end_date": "2026-07-03"}]})
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_empty_search_windows(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": []})
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_invalid_day_of_week(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "days_of_week": [0, 7]})
+    assert resp.status_code == 422
+
+
 def test_get_scan_returns_scan(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
@@ -49,7 +96,7 @@ def test_get_scan_returns_scan(auth_client):
     assert resp.json()["id"] == scan_id
 
 
-def test_get_scan_returns_403_for_wrong_owner(auth_client):
+def test_get_scan_returns_404_for_wrong_owner(auth_client):
     client, _ = auth_client
     with get_db(api_db.get_factory()) as db:
         other = User(email="other@e.com", hashed_password=hash_password("pw"), scan_limit=5)
@@ -58,7 +105,7 @@ def test_get_scan_returns_403_for_wrong_owner(auth_client):
         other_id = other.id
     scan_id = _make_scan(other_id)
     resp = client.get(f"/api/v1/scans/{scan_id}")
-    assert resp.status_code == 403
+    assert resp.status_code == 404
 
 
 def test_get_scan_returns_404_for_missing(auth_client):
@@ -78,12 +125,10 @@ def test_update_scan_changes_nights(auth_client):
 def test_patch_scan_ignores_status_field(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
-    # status is not in ScanUpdate schema, so pydantic strips it.
-    # Scan should remain "active".
     resp = client.patch(f"/api/v1/scans/{scan_id}", json={"status": "paused", "nights": 5})
     assert resp.status_code == 200
-    assert resp.json()["status"] == "active"  # status unchanged
-    assert resp.json()["nights"] == 5         # other fields still update
+    assert resp.json()["status"] == "active"
+    assert resp.json()["nights"] == 5
 
 
 def test_delete_scan_soft_deletes(auth_client):
@@ -103,12 +148,26 @@ def test_pause_scan(auth_client):
     assert resp.json()["status"] == "paused"
 
 
+def test_pause_already_paused_scan_returns_409(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"], status=ScanStatus.paused)
+    resp = client.post(f"/api/v1/scans/{scan_id}/pause")
+    assert resp.status_code == 409
+
+
 def test_resume_scan(auth_client):
     client, info = auth_client
-    scan_id = _make_scan(info["id"], status="paused")
+    scan_id = _make_scan(info["id"], status=ScanStatus.paused)
     resp = client.post(f"/api/v1/scans/{scan_id}/resume")
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
+
+
+def test_resume_active_scan_returns_409(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.post(f"/api/v1/scans/{scan_id}/resume")
+    assert resp.status_code == 409
 
 
 def test_list_runs_returns_empty(auth_client):
@@ -128,7 +187,6 @@ def test_list_results_returns_empty(auth_client):
 
 
 def test_all_scan_routes_require_auth(client):
-    # GET routes — no json body
     for path in [
         "/api/v1/scans",
         "/api/v1/scans/1",
@@ -137,7 +195,6 @@ def test_all_scan_routes_require_auth(client):
     ]:
         resp = client.get(path)
         assert resp.status_code == 401, f"GET {path} should return 401"
-    # State-mutating routes — json body where appropriate
     for path in ["/api/v1/scans"]:
         resp = client.post(path, json={"search_windows": WINDOWS})
         assert resp.status_code == 401, f"POST {path} should return 401"

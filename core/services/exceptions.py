@@ -1,10 +1,18 @@
-class NotFound(Exception):
+class ServiceError(Exception):
     pass
 
 
-class Forbidden(Exception):
+class NotFound(ServiceError):
     pass
 
 
-class LimitExceeded(Exception):
+class Forbidden(ServiceError):
+    pass
+
+
+class LimitExceeded(ServiceError):
+    pass
+
+
+class InvalidState(ServiceError):
     pass
