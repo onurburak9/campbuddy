@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/me", response_model=ProfileResponse)
+def get_profile(
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
+    return user
+
+
 @router.patch("/me", response_model=ProfileResponse)
 def patch_profile(
     body: ProfileUpdate,
