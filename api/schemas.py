@@ -36,6 +36,7 @@ class MeResponse(BaseModel):
     email: str
     scan_limit: int
     scans_used: int
+    has_telegram: bool
 
     class Config:
         orm_mode = True
