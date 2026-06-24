@@ -17,7 +17,7 @@
 - **Providers:** the provider dropdown must use exactly these 19 values (from `api/schemas.py` `VALID_PROVIDERS`): RecreationDotGov, Yellowstone, GoingToCamp, ReserveCalifornia, AlabamaStateParks, ArizonaStateParks, FloridaStateParks, MinnesotaStateParks, MissouriStateParks, OhioStateParks, VirginiaStateParks, NorthernTerritory, FairfaxCountyParks, MaricopaCountyParks, OregonMetro, RecreationDotGovTicket, RecreationDotGovTimedEntry, RecreationDotGovDailyTicket, RecreationDotGovDailyTimedEntry.
 - **days_of_week:** integers 0–6 where Monday=0 … Sunday=6.
 - **Colors (exact hex):** primary forest `#2E6F40`, primary-dark `#1B4332`, campfire accent `#C7522A`, success `#22C55E`, warning `#EAB308`, error `#DC2626`, info `#60A5FA`. Light bg `#FAF9F6` / surface `#FFFFFF` / border `#DFDCD9`. Dark bg `#0D0D0D` / surface `#1A1A1A` / border `#222222`.
-- **Status semantics:** scan `status` is `active` | `paused`. Run `outcome` is `success` | `no_results` | `error` | null (running). Green=success/active, yellow=no_results/paused, red=error.
+- **Status semantics:** scan `status` is `active` | `paused` | `completed` (the ORM `ScanStatus` enum has all three). Run `outcome` is `success` | `no_results` | `error` | null (running). Tone mapping: active→success(green), paused→warning(yellow), completed→neutral(gray); run success→green, no_results→yellow, error→red.
 - **Node:** built and verified on Node 20+ (local env is v25). All commands run from `frontend/`.
 
 ---
@@ -398,7 +398,7 @@ git commit -m "feat(ui): tailwind theme + cn helper"
 - [ ] **Step 1: Create `src/types/index.ts`**
 
 ```ts
-export type ScanStatus = "active" | "paused";
+export type ScanStatus = "active" | "paused" | "completed";
 export type RunOutcome = "success" | "no_results" | "error";
 
 export interface User {
@@ -2131,10 +2131,18 @@ Expected: FAIL.
 import { cn } from "../../lib/cn";
 import { StatusDot } from "../ui/StatusDot";
 import { dateRange } from "../../lib/format";
-import type { Scan } from "../../types";
+import type { Scan, ScanStatus } from "../../types";
 
 export function scanTitle(scan: Scan): string {
   return scan.name?.trim() || `${scan.provider} #${scan.rec_area_ids?.[0] ?? scan.id}`;
+}
+
+export function scanStatusTone(status: ScanStatus): "success" | "warning" | "neutral" {
+  switch (status) {
+    case "active": return "success";
+    case "paused": return "warning";
+    case "completed": return "neutral";
+  }
 }
 
 export function ScanListItem({ scan, selected, onClick }: {
@@ -2152,7 +2160,7 @@ export function ScanListItem({ scan, selected, onClick }: {
       )}
     >
       <span className="flex items-center gap-2">
-        <StatusDot tone={scan.status === "active" ? "success" : "warning"} />
+        <StatusDot tone={scanStatusTone(scan.status)} />
         <span className="truncate text-sm font-medium text-stone-800 dark:text-[#EEE]">
           {scanTitle(scan)}
         </span>
@@ -2316,7 +2324,7 @@ Expected: FAIL.
 import { usePauseScan, useResumeScan, useDeleteScan } from "../../hooks/useScans";
 import { StatusDot } from "../ui/StatusDot";
 import { Button } from "../ui/Button";
-import { scanTitle } from "../layout/ScanListItem";
+import { scanTitle, scanStatusTone } from "../layout/ScanListItem";
 import type { Scan } from "../../types";
 
 export function ScanDetailHeader({ scan, onDeleted, onEdit }: {
@@ -2343,7 +2351,7 @@ export function ScanDetailHeader({ scan, onDeleted, onEdit }: {
     <header className="flex items-start justify-between border-b border-sand-200 px-6 py-4 dark:border-[#222]">
       <div>
         <div className="flex items-center gap-2">
-          <StatusDot tone={isActive ? "success" : "warning"} />
+          <StatusDot tone={scanStatusTone(scan.status)} />
           <h1 className="text-xl font-bold text-stone-900 dark:text-[#EEE]">{scanTitle(scan)}</h1>
         </div>
         <p className="mt-1 text-sm text-stone-500 dark:text-[#888]">{meta}</p>
