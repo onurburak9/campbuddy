@@ -1,4 +1,4 @@
-export type ScanStatus = "active" | "paused";
+export type ScanStatus = "active" | "paused" | "completed";
 export type RunOutcome = "success" | "no_results" | "error";
 
 export interface User {
