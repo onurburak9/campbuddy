@@ -186,12 +186,48 @@ def test_list_results_returns_empty(auth_client):
     assert resp.json() == []
 
 
+def test_get_stats_returns_zeros_for_new_scan(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sites_found"] == 0
+    assert data["in_cart"] == 0
+    assert data["total_runs"] == 0
+    assert data["success_rate"] == 0
+
+
+def test_get_stats_returns_404_for_wrong_owner(auth_client):
+    client, _ = auth_client
+    with get_db(api_db.get_factory()) as db:
+        other = User(email="other2@e.com", hashed_password=hash_password("pw"), scan_limit=5)
+        db.add(other)
+        db.flush()
+        other_id = other.id
+    scan_id = _make_scan(other_id)
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats")
+    assert resp.status_code == 404
+
+
+def test_get_stats_returns_404_for_missing_scan(auth_client):
+    client, _ = auth_client
+    resp = client.get("/api/v1/scans/9999/stats")
+    assert resp.status_code == 404
+
+
+def test_get_stats_requires_auth(client):
+    resp = client.get("/api/v1/scans/1/stats")
+    assert resp.status_code == 401
+
+
 def test_all_scan_routes_require_auth(client):
     for path in [
         "/api/v1/scans",
         "/api/v1/scans/1",
         "/api/v1/scans/1/runs",
         "/api/v1/scans/1/results",
+        "/api/v1/scans/1/stats",
     ]:
         resp = client.get(path)
         assert resp.status_code == 401, f"GET {path} should return 401"
