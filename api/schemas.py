@@ -161,6 +161,16 @@ class ScanResultResponse(BaseModel):
         orm_mode = True
 
 
+class ScanStatsResponse(BaseModel):
+    sites_found: int
+    in_cart: int
+    total_runs: int
+    success_rate: int
+
+    class Config:
+        orm_mode = True
+
+
 class ProfileUpdate(BaseModel):
     email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
