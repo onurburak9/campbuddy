@@ -6,7 +6,7 @@ import { server } from "../../test/server";
 import { ResultsTab } from "./ResultsTab";
 
 const result = {
-  id: 1, scan_id: 7, campsite_id: "A1", facility_name: "Upper Pines", site_name: "Site 42",
+  id: 1, scan_id: 7, scan_run_id: 9, campsite_id: "A1", facility_name: "Upper Pines", site_name: "Site 42",
   campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03",
   booking_url: "https://recreation.gov/x", first_seen_at: "2026-06-24T11:00:00Z",
   cart_added: true, notified: true,
@@ -30,5 +30,14 @@ describe("ResultsTab", () => {
     server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([])));
     wrap(<ResultsTab scanId={7} />);
     await waitFor(() => expect(screen.getByText(/no results yet/i)).toBeInTheDocument());
+  });
+
+  it("renders campsite id, first-seen, notified badge and run link", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([result])));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+    expect(screen.getByText(/#A1/)).toBeInTheDocument();       // campsite_id
+    expect(screen.getByText(/notified/i)).toBeInTheDocument();  // badge
+    expect(screen.getByText(/run #9/)).toBeInTheDocument();     // discovering run
   });
 });

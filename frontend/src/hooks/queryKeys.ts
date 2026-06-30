@@ -5,5 +5,6 @@ export const queryKeys = {
   scan: (id: number) => ["scans", id] as const,
   stats: (id: number) => ["scans", id, "stats"] as const,
   runs: (id: number, page: number) => ["scans", id, "runs", page] as const,
-  results: (id: number, page: number) => ["scans", id, "results", page] as const,
+  results: (id: number, page: number, pageSize: number) =>
+    ["scans", id, "results", { page, pageSize }] as const,
 };
