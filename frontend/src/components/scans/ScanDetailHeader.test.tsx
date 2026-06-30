@@ -15,6 +15,14 @@ const scan = {
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 } as const satisfies Scan;
 
+const scanWithCampgrounds = {
+  id: 7, user_id: 1, provider: "RecreationDotGov", name: "Yosemite", status: "active",
+  polling_interval: 600, rec_area_ids: null, campground_ids: [232447], campsite_ids: null,
+  search_windows: [{ start_date: "2026-07-01", end_date: "2026-07-03" }], nights: 2,
+  days_of_week: null, weekends_only: false, notify_via_email: true,
+  notify_via_telegram: false, notify_on_new_only: false, created_at: "2026-06-01T00:00:00Z",
+} as const satisfies Scan;
+
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
@@ -30,6 +38,14 @@ describe("ScanDetailHeader", () => {
     wrap(<ScanDetailHeader scan={scan} onDeleted={vi.fn()} onEdit={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: /pause/i }));
     await waitFor(() => expect(paused).toBe(true));
+  });
+
+  it("shows scan id, campground ids, polling interval and notifications", () => {
+    wrap(<ScanDetailHeader scan={scanWithCampgrounds} onDeleted={vi.fn()} onEdit={vi.fn()} />);
+    expect(screen.getByText(/#7/)).toBeInTheDocument();
+    expect(screen.getByText(/campgrounds 232447/)).toBeInTheDocument();
+    expect(screen.getByText(/10 min/)).toBeInTheDocument();
+    expect(screen.getByText(/Email/)).toBeInTheDocument();
   });
 
   it("deletes after confirm and calls onDeleted", async () => {
