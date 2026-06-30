@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, date, timezone
 from db.models import Scan, ScanRun, ScanResult, ScanOutcome
 from core.services.history import list_runs, list_results, stats
+from core.services import history as history_svc
 from core.services.exceptions import NotFound
 from tests.services.conftest import make_user
 
@@ -204,3 +205,71 @@ def test_stats_raises_not_found_for_missing_scan(db):
     u = make_user(db)
     with pytest.raises(NotFound):
         stats(db, 9999, u.id)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures for outcome-filter and per-run-results tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def seeded_scan(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    # one success run, one no_results run
+    run1 = ScanRun(
+        scan_id=scan.id,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+        outcome=ScanOutcome.success,
+        sites_found=1,
+    )
+    run2 = ScanRun(
+        scan_id=scan.id,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+        outcome=ScanOutcome.no_results,
+        sites_found=0,
+    )
+    db.add_all([run1, run2])
+    db.flush()
+    scan.user_id = u.id  # expose user_id for test assertions
+    return scan
+
+
+@pytest.fixture
+def seeded_scan_with_results(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    run = _make_run(db, scan.id)
+    _make_result(db, scan.id, run.id)
+    _make_result(db, scan.id, run.id)
+    other_run = _make_run(db, scan.id)
+    _make_result(db, scan.id, other_run.id)
+    return scan, run, other_run
+
+
+# ---------------------------------------------------------------------------
+# New tests: outcome filter and per-run results
+# ---------------------------------------------------------------------------
+
+def test_list_runs_filters_by_outcome(db, seeded_scan):
+    success = history_svc.list_runs(db, seeded_scan.id, seeded_scan.user_id, outcome="success")
+    assert all(r.outcome.value == "success" for r in success)
+    all_runs = history_svc.list_runs(db, seeded_scan.id, seeded_scan.user_id)
+    assert len(all_runs) >= len(success)
+
+
+def test_list_run_results_returns_only_that_runs_sites(db, seeded_scan_with_results):
+    scan, run, other_run = seeded_scan_with_results
+    rows = history_svc.list_run_results(db, scan.id, run.id, scan.user_id)
+    assert {r.scan_run_id for r in rows} == {run.id}
+    assert len(rows) == 2
+
+
+def test_list_run_results_unknown_run_raises(db, seeded_scan):
+    with pytest.raises(NotFound):
+        history_svc.list_run_results(db, seeded_scan.id, 999999, seeded_scan.user_id)

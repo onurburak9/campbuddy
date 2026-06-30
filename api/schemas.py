@@ -146,6 +146,7 @@ class ScanRunResponse(BaseModel):
 
 class ScanResultResponse(BaseModel):
     id: int
+    scan_run_id: int
     scan_id: int
     campsite_id: str
     facility_name: str

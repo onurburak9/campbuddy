@@ -1,11 +1,12 @@
 import json
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from api.deps import get_db_dep, get_current_user
 from api.schemas import ScanCreate, ScanUpdate, ScanResponse, ScanRunResponse, ScanResultResponse, ScanStatsResponse
 from core.services import scans as scans_svc
 from core.services import history as history_svc
+from db.models import ScanOutcome
 
 router = APIRouter()
 
@@ -50,10 +51,21 @@ def list_runs(
     scan_id: int,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    outcome: Optional[ScanOutcome] = Query(default=None),
     db: Session = Depends(get_db_dep),
     user=Depends(get_current_user),
 ):
-    return history_svc.list_runs(db, scan_id, user.id, page=page, page_size=page_size)
+    return history_svc.list_runs(db, scan_id, user.id, page=page, page_size=page_size, outcome=outcome)
+
+
+@router.get("/{scan_id}/runs/{run_id}/results", response_model=List[ScanResultResponse])
+def list_run_results(
+    scan_id: int,
+    run_id: int,
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
+    return history_svc.list_run_results(db, scan_id, run_id, user.id)
 
 
 @router.get("/{scan_id}/results", response_model=List[ScanResultResponse])

@@ -1,15 +1,34 @@
 from db.models import ScanRun, ScanResult, ScanOutcome
 from core.services.scans import get_scan
+from core.services.exceptions import NotFound
 
 
-def list_runs(db, scan_id: int, user_id: int, page: int = 1, page_size: int = 20) -> list:
+def list_runs(db, scan_id: int, user_id: int, page: int = 1, page_size: int = 20, outcome=None) -> list:
     get_scan(db, scan_id, user_id)
+    q = db.query(ScanRun).filter(ScanRun.scan_id == scan_id)
+    if outcome is not None:
+        q = q.filter(ScanRun.outcome == outcome)
     return (
-        db.query(ScanRun)
-        .filter(ScanRun.scan_id == scan_id)
-        .order_by(ScanRun.started_at.desc())
+        q.order_by(ScanRun.started_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
+        .all()
+    )
+
+
+def list_run_results(db, scan_id: int, run_id: int, user_id: int) -> list:
+    get_scan(db, scan_id, user_id)
+    run = (
+        db.query(ScanRun)
+        .filter(ScanRun.id == run_id, ScanRun.scan_id == scan_id)
+        .first()
+    )
+    if run is None:
+        raise NotFound(f"Run {run_id} not found for scan {scan_id}")
+    return (
+        db.query(ScanResult)
+        .filter(ScanResult.scan_run_id == run_id)
+        .order_by(ScanResult.first_seen_at.desc())
         .all()
     )
 
