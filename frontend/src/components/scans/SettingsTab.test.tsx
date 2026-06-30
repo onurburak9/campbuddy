@@ -38,4 +38,16 @@ describe("SettingsTab", () => {
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
     await waitFor(() => expect(patched?.name).toBe("Yosemite Fall"));
   });
+
+  it("sends notify_via_email=false when toggling the email switch off", async () => {
+    let patched: any = null;
+    server.use(http.patch("/api/v1/scans/7", async ({ request }) => {
+      patched = await request.json();
+      return HttpResponse.json({ ...scan, ...patched });
+    }));
+    wrap(<SettingsTab scan={scan} />);
+    await userEvent.click(screen.getByRole("switch", { name: /notify via email/i }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() => expect(patched?.notify_via_email).toBe(false));
+  });
 });
