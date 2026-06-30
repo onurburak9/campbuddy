@@ -53,6 +53,7 @@ export interface ScanRun {
 
 export interface ScanResult {
   id: number;
+  scan_run_id: number;
   scan_id: number;
   campsite_id: string;
   facility_name: string;

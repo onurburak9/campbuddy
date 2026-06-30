@@ -25,3 +25,12 @@ export function duration(start: string, end: string | null): string {
   const min = Math.floor(sec / 60);
   return `${min}m ${sec % 60}s`;
 }
+
+export function formatInterval(seconds: number): string {
+  if (seconds % 3600 === 0) {
+    const h = seconds / 3600;
+    return `${h} hour${h > 1 ? "s" : ""}`;
+  }
+  if (seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} sec`;
+}

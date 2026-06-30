@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { relativeTime, dateRange, duration } from "./format";
+import { formatInterval } from "./format";
 
 describe("format", () => {
   beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-06-24T12:00:00Z")));
@@ -16,5 +17,13 @@ describe("format", () => {
   });
   it("duration renders seconds", () => {
     expect(duration("2026-06-24T11:59:48Z", "2026-06-24T12:00:00Z")).toBe("12s");
+  });
+});
+
+describe("formatInterval", () => {
+  it("formats minutes and hours", () => {
+    expect(formatInterval(300)).toBe("5 min");
+    expect(formatInterval(3600)).toBe("1 hour");
+    expect(formatInterval(7200)).toBe("2 hours");
   });
 });

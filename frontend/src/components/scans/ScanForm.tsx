@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 import { PROVIDERS } from "../../types";
 import type { ScanFormState } from "./useScanFormState";
 import type { SearchWindow } from "../../types";
+import { formatInterval } from "../../lib/format";
 
 type Setter = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) => void;
 
@@ -22,12 +23,6 @@ const POLLING_OPTIONS = [
   { value: "7200", label: "2 hours" },
   { value: "21600", label: "6 hours" },
 ];
-
-function formatInterval(seconds: number): string {
-  if (seconds % 3600 === 0) { const h = seconds / 3600; return `${h} hour${h > 1 ? "s" : ""}`; }
-  if (seconds % 60 === 0) return `${seconds / 60} min`;
-  return `${seconds} sec`;
-}
 
 export function ProviderSitesFields({ state, set }: { state: ScanFormState; set: Setter }) {
   return (
