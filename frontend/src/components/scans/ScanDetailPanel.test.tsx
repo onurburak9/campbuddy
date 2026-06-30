@@ -4,6 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { server } from "../../test/server";
+import { queryKeys } from "../../hooks/queryKeys";
 
 vi.mock("../../contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, email: "a@b.c", scan_limit: 5, scans_used: 0, has_telegram: true } }),
@@ -30,11 +31,6 @@ const scan5: Scan = {
 
 const emptyStats = { sites_found: 0, in_cart: 0, total_runs: 0, success_rate: 0 };
 
-function wrap(ui: React.ReactNode) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
-}
-
 describe("ScanDetailPanel", () => {
   it("remounts tab content when switching scans — Settings tab shows new scan name", async () => {
     server.use(
@@ -48,8 +44,18 @@ describe("ScanDetailPanel", () => {
       http.get("/api/v1/scans/5/results", () => HttpResponse.json([])),
     );
 
-    const { rerender } = wrap(
-      <ScanDetailPanel scanId={4} onDeleted={vi.fn()} />,
+    // ONE stable QueryClient shared across both renders.
+    // Pre-seeding scan5 into the cache before the rerender is the critical step:
+    // it ensures useScan(5) returns data immediately (no loading flash), so
+    // ScanDetailPanel stays fully mounted when scanId switches from 4 → 5.
+    // Without key={scan.id} on the tab-content div, useScanFormState keeps its
+    // once-initialised state ("Sequioa") and the test correctly fails.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <ScanDetailPanel scanId={4} onDeleted={vi.fn()} />
+      </QueryClientProvider>,
     );
 
     // Wait for scan 4 header to appear
@@ -63,8 +69,15 @@ describe("ScanDetailPanel", () => {
       expect(screen.getByDisplayValue("Sequioa")).toBeInTheDocument()
     );
 
-    // Switch to scan 5 (keep the same QueryClient so cached data is available)
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Pre-seed scan5 into the cache so the rerender has NO loading state.
+    // Without this, the isLoading→false transition naturally remounts SettingsTab
+    // even without key={scan.id}, making the test a false positive.
+    qc.setQueryData(queryKeys.scan(5), scan5);
+
+    // Switch to scan 5 — reuse the SAME qc instance so only the scanId prop changes.
+    // Because scan5 is already cached, ScanDetailPanel stays mounted through the
+    // transition. Only key={scan.id} on the tab-content div forces SettingsTab to
+    // remount and re-initialise useScanFormState with the new scan's values.
     rerender(
       <QueryClientProvider client={qc}>
         <ScanDetailPanel scanId={5} onDeleted={vi.fn()} />
