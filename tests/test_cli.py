@@ -94,3 +94,29 @@ def test_update_user_sets_scan_limit(runner, factory):
     with factory() as db:
         user = db.query(User).filter(User.id == user_id).first()
         assert user.scan_limit == 3
+
+
+# --- set-password ---
+
+def test_set_password_sets_hashed_password_for_existing_user(runner, factory):
+    _seed_user(factory, email="alice@example.com")
+    result = runner.invoke(
+        cli,
+        ["set-password", "alice@example.com", "--password", "s3cr3t!"],
+    )
+    assert result.exit_code == 0
+    assert "Password set" in result.output
+    from api.auth import verify_password
+    with factory() as db:
+        user = db.query(User).filter(User.email == "alice@example.com").first()
+        assert user.hashed_password is not None
+        assert verify_password("s3cr3t!", user.hashed_password)
+
+
+def test_set_password_fails_for_unknown_email(runner, factory):
+    result = runner.invoke(
+        cli,
+        ["set-password", "nobody@example.com", "--password", "pass"],
+    )
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
