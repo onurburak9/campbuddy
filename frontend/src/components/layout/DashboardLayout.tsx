@@ -25,7 +25,7 @@ export function DashboardLayout() {
           onCreated={(id) => { setWizardOpen(false); setSelectedScanId(id); }}
         />
       ) : selectedScanId != null ? (
-        <ScanDetailPanel scanId={selectedScanId} />
+        <ScanDetailPanel scanId={selectedScanId} onDeleted={() => setSelectedScanId(null)} />
       ) : (
         <WelcomePanel />
       )}
