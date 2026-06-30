@@ -14,10 +14,20 @@ const DAYS = [
 ];
 
 const POLLING_OPTIONS = [
-  { value: "60", label: "1 min" }, { value: "300", label: "5 min" },
-  { value: "600", label: "10 min" }, { value: "900", label: "15 min" },
+  { value: "300", label: "5 min" },
+  { value: "900", label: "15 min" },
   { value: "1800", label: "30 min" },
+  { value: "2700", label: "45 min" },
+  { value: "3600", label: "1 hour" },
+  { value: "7200", label: "2 hours" },
+  { value: "21600", label: "6 hours" },
 ];
+
+function formatInterval(seconds: number): string {
+  if (seconds % 3600 === 0) { const h = seconds / 3600; return `${h} hour${h > 1 ? "s" : ""}`; }
+  if (seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} sec`;
+}
 
 export function ProviderSitesFields({ state, set }: { state: ScanFormState; set: Setter }) {
   return (
@@ -104,13 +114,18 @@ export function NotificationsFields({
   set: Setter;
   telegramAvailable: boolean;
 }) {
+  const currentVal = String(state.pollingInterval);
+  const pollingOptions = POLLING_OPTIONS.some((o) => o.value === currentVal)
+    ? POLLING_OPTIONS
+    : [{ value: currentVal, label: formatInterval(state.pollingInterval) }, ...POLLING_OPTIONS];
+
   return (
     <div className="space-y-4">
       <Select
         label="Polling interval"
-        value={String(state.pollingInterval)}
+        value={currentVal}
         onChange={(v) => set("pollingInterval", Number(v))}
-        options={POLLING_OPTIONS}
+        options={pollingOptions}
       />
       <Toggle label="Notify via email" checked={state.notifyEmail}
         onChange={(v) => set("notifyEmail", v)} />
