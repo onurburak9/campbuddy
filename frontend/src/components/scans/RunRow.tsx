@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StatusDot } from "../ui/StatusDot";
 import { Spinner } from "../ui/Spinner";
-import { relativeTime, duration, dateRange } from "../../lib/format";
+import { relativeTime, duration, dateRange, dateTime } from "../../lib/format";
 import { outcomeLabel, outcomeTone } from "./RunHealthBar";
 import { useRunResults } from "../../hooks/useRuns";
 import type { ScanRun } from "../../types";
@@ -24,7 +24,7 @@ export function RunRow({ scanId, run }: { scanId: number; run: ScanRun }) {
           <StatusDot tone={outcomeTone(run.outcome)} />
           <span className="text-sm font-medium text-stone-800 dark:text-[#EEE]">{outcomeLabel(run.outcome)}</span>
           <span className="text-sm text-stone-400" title={new Date(run.started_at).toLocaleString()}>
-            {relativeTime(run.started_at)}
+            {relativeTime(run.started_at)} · {dateTime(run.started_at)}
           </span>
         </button>
         <div className="flex gap-4 text-sm text-stone-500 dark:text-[#888]">

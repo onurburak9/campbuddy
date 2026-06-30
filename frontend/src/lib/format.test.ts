@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { relativeTime, dateRange, duration } from "./format";
+import { relativeTime, dateRange, duration, dateTime } from "./format";
 import { formatInterval } from "./format";
 
 describe("format", () => {
@@ -8,6 +8,9 @@ describe("format", () => {
 
   it("relativeTime renders minutes ago", () => {
     expect(relativeTime("2026-06-24T11:57:00Z")).toMatch(/3 min/);
+  });
+  it("dateTime renders a month-day fragment", () => {
+    expect(dateTime("2026-06-24T17:03:00Z")).toMatch(/[A-Z][a-z]{2} \d{1,2}/);
   });
   it("dateRange renders a compact range", () => {
     expect(dateRange("2026-05-12", "2026-05-14")).toMatch(/May 12.*May 14/);

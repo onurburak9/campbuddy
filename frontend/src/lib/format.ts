@@ -26,6 +26,12 @@ export function duration(start: string, end: string | null): string {
   return `${min}m ${sec % 60}s`;
 }
 
+export function dateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
 export function formatInterval(seconds: number): string {
   if (seconds % 3600 === 0) {
     const h = seconds / 3600;
