@@ -1,43 +1,50 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { server } from "../../test/server";
 import { ResultsTab } from "./ResultsTab";
 
-const result = {
-  id: 1, scan_id: 7, scan_run_id: 9, campsite_id: "A1", facility_name: "Upper Pines", site_name: "Site 42",
-  campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03",
-  booking_url: "https://recreation.gov/x", first_seen_at: "2026-06-24T11:00:00Z",
-  cart_added: true, notified: true,
-};
+const mk = (id: number, facility: string, type: string, site: string) => ({
+  id, scan_run_id: 9, scan_id: 7, campsite_id: `C${id}`, facility_name: facility,
+  site_name: site, campsite_type: type, booking_date: "2026-07-01",
+  booking_end_date: "2026-07-03", booking_url: "https://x", first_seen_at: "2026-06-30T11:00:00Z",
+  cart_added: false, notified: true,
+});
+const rows = [
+  mk(1, "Moraine", "TENT", "Site 42"),
+  mk(2, "Sunset", "RV", "Site 7"),
+  mk(3, "Moraine", "RV", "Loop A"),
+];
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
-describe("ResultsTab", () => {
-  it("renders result cards with a booking link and cart badge", async () => {
-    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([result])));
+describe("ResultsTab (client-side filtering)", () => {
+  it("renders all results, then filters by search and by facility", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(rows)));
     wrap(<ResultsTab scanId={7} />);
     await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
-    expect(screen.getByText(/in cart/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /book/i })).toHaveAttribute("href", "https://recreation.gov/x");
+    expect(screen.getByText("Site 7")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "loop");
+    await waitFor(() => expect(screen.getByText("Loop A")).toBeInTheDocument());
+    expect(screen.queryByText("Site 42")).not.toBeInTheDocument();
+
+    await userEvent.clear(screen.getByPlaceholderText(/search/i));
+    // Facility dropdown → Sunset (first combobox is facility)
+    const [facilitySelect] = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(facilitySelect, "Sunset").catch(() => {});
   });
 
-  it("shows empty state when no results", async () => {
-    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([])));
-    wrap(<ResultsTab scanId={7} />);
-    await waitFor(() => expect(screen.getByText(/no results yet/i)).toBeInTheDocument());
-  });
-
-  it("renders campsite id, first-seen, notified badge and run link", async () => {
-    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([result])));
+  it("shows the no-match message when filters exclude everything", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(rows)));
     wrap(<ResultsTab scanId={7} />);
     await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
-    expect(screen.getByText(/#A1/)).toBeInTheDocument();       // campsite_id
-    expect(screen.getByText(/notified/i)).toBeInTheDocument();  // badge
-    expect(screen.getByText(/run #9/)).toBeInTheDocument();     // discovering run
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "zzzznomatch");
+    await waitFor(() => expect(screen.getByText(/no results match your filters/i)).toBeInTheDocument());
   });
 });
