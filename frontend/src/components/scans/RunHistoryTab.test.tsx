@@ -17,6 +17,20 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("RunHistoryTab", () => {
+  it("passes started_after when a time range is selected", async () => {
+    let lastUrl = "";
+    server.use(http.get("/api/v1/scans/7/runs", ({ request }) => {
+      lastUrl = request.url;
+      return HttpResponse.json([]);
+    }));
+    wrap(<RunHistoryTab scanId={7} />);
+    await waitFor(() => expect(lastUrl).toContain("/scans/7/runs"));
+    // pick "Last 7 days" from the range select
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[0], "7d");
+    await waitFor(() => expect(lastUrl).toContain("started_after="));
+  });
+
   it("renders a run row with outcome and expandable error", async () => {
     server.use(http.get("/api/v1/scans/7/runs", () => HttpResponse.json([run])));
     wrap(<RunHistoryTab scanId={7} />);
