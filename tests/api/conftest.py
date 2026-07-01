@@ -7,7 +7,7 @@ os.environ.setdefault("SMTP_PASSWORD", "pw")
 os.environ.setdefault("SMTP_FROM", "t@e.com")
 
 import pytest
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from unittest.mock import patch
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
@@ -67,7 +67,7 @@ def auth_client(client, user_in_db):
 
 @pytest.fixture
 def scan_with_runs(user_in_db):
-    """Return a Scan with one success run and one no_results run."""
+    """Return a Scan with one recent success run, one recent no_results run, and one old run."""
     with get_db(api_db.get_factory()) as db:
         scan = Scan(user_id=user_in_db["id"], search_windows=WINDOWS)
         db.add(scan)
@@ -86,7 +86,14 @@ def scan_with_runs(user_in_db):
             outcome=ScanOutcome.no_results,
             sites_found=0,
         )
-        db.add_all([run_success, run_no_results])
+        run_old = ScanRun(
+            scan_id=scan.id,
+            started_at=datetime.now(timezone.utc) - timedelta(days=3),
+            finished_at=datetime.now(timezone.utc) - timedelta(days=3),
+            outcome=ScanOutcome.success,
+            sites_found=0,
+        )
+        db.add_all([run_success, run_no_results, run_old])
         db.flush()
         # Capture id before session closes
         class _Scan:

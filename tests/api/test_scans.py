@@ -267,3 +267,17 @@ def test_run_results_404_for_unknown_run(auth_client, scan_with_results):
     scan, _ = scan_with_results
     r = client.get(f"/api/v1/scans/{scan.id}/runs/999999/results")
     assert r.status_code == 404
+
+
+def test_runs_started_after_filter(auth_client, scan_with_runs):
+    client, _ = auth_client
+    scan = scan_with_runs
+    from datetime import datetime, timezone, timedelta
+    from urllib.parse import urlencode
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    cutoff = cutoff_dt.isoformat()
+    params = urlencode({"started_after": cutoff})
+    r = client.get(f"/api/v1/scans/{scan.id}/runs?{params}")
+    assert r.status_code == 200
+    for item in r.json():
+        assert item["started_at"] >= cutoff

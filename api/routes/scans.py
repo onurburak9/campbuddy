@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -52,10 +53,14 @@ def list_runs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     outcome: Optional[ScanOutcome] = Query(default=None),
+    started_after: Optional[datetime] = Query(default=None),
     db: Session = Depends(get_db_dep),
     user=Depends(get_current_user),
 ):
-    return history_svc.list_runs(db, scan_id, user.id, page=page, page_size=page_size, outcome=outcome)
+    return history_svc.list_runs(
+        db, scan_id, user.id, page=page, page_size=page_size,
+        outcome=outcome, started_after=started_after,
+    )
 
 
 @router.get("/{scan_id}/runs/{run_id}/results", response_model=List[ScanResultResponse])

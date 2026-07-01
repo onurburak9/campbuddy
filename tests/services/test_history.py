@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from db.models import Scan, ScanRun, ScanResult, ScanOutcome
 from core.services.history import list_runs, list_results, stats
 from core.services import history as history_svc
@@ -273,3 +273,45 @@ def test_list_run_results_returns_only_that_runs_sites(db, seeded_scan_with_resu
 def test_list_run_results_unknown_run_raises(db, seeded_scan):
     with pytest.raises(NotFound):
         history_svc.list_run_results(db, seeded_scan.id, 999999, seeded_scan.user_id)
+
+
+# ---------------------------------------------------------------------------
+# Fixture and test for started_after filter
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def seeded_scan_with_runs(db):
+    u = make_user(db, "runs@e.com")
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    # one old run (3 days ago) and one recent run (1 hour ago)
+    old_run = ScanRun(
+        scan_id=scan.id,
+        started_at=datetime.now(timezone.utc) - timedelta(days=3),
+        finished_at=datetime.now(timezone.utc) - timedelta(days=3),
+        outcome=ScanOutcome.success,
+        sites_found=0,
+    )
+    recent_run = ScanRun(
+        scan_id=scan.id,
+        started_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        finished_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        outcome=ScanOutcome.no_results,
+        sites_found=0,
+    )
+    db.add_all([old_run, recent_run])
+    db.flush()
+    scan.user_id = u.id
+    return scan
+
+
+def test_list_runs_filters_by_started_after(db, seeded_scan_with_runs):
+    scan = seeded_scan_with_runs  # has runs across a range of started_at
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    recent = history_svc.list_runs(db, scan.id, scan.user_id, started_after=cutoff)
+    # SQLite returns naive datetimes; compare with a naive cutoff for assertion
+    cutoff_naive = cutoff.replace(tzinfo=None)
+    assert all(r.started_at >= cutoff_naive for r in recent)
+    all_runs = history_svc.list_runs(db, scan.id, scan.user_id)
+    assert len(recent) <= len(all_runs)
