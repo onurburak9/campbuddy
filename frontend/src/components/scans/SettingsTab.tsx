@@ -14,8 +14,12 @@ export function SettingsTab({ scan }: { scan: Scan }) {
 
   async function onSave() {
     setSaved(false);
-    await update.mutateAsync({ id: scan.id, payload: form.toScanUpdatePayload() });
-    setSaved(true);
+    try {
+      await update.mutateAsync({ id: scan.id, payload: form.toScanUpdatePayload() });
+      setSaved(true);
+    } catch {
+      // error surfaced via update.isError in the UI
+    }
   }
 
   return (

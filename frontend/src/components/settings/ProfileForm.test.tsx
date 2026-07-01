@@ -12,6 +12,17 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("ProfileForm", () => {
+  it("shows 'Save failed' and does not throw when PATCH returns 500", async () => {
+    server.use(http.get("/api/v1/users/me", () =>
+      HttpResponse.json({ id: 1, email: "a@b.c", telegram_chat_id: null, recreationgov_email: null, scan_limit: 5 })));
+    server.use(http.patch("/api/v1/users/me", () => HttpResponse.json({ detail: "error" }, { status: 500 })));
+    wrap(<ProfileForm />);
+    const telegram = await screen.findByLabelText(/telegram chat id/i);
+    await userEvent.type(telegram, "999");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(await screen.findByText(/save failed/i)).toBeInTheDocument();
+  });
+
   it("hydrates from GET /users/me, submits only changed fields, shows Saved", async () => {
     server.use(http.get("/api/v1/users/me", () =>
       HttpResponse.json({ id: 1, email: "a@b.c", telegram_chat_id: null, recreationgov_email: null, scan_limit: 5 })));

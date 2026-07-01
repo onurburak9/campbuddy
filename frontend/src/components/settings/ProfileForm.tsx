@@ -29,9 +29,13 @@ function ProfileFields({ profile }: { profile: Profile }) {
     if (telegram !== (profile.telegram_chat_id ?? "")) payload.telegram_chat_id = telegram;
     if (recEmail !== (profile.recreationgov_email ?? "")) payload.recreationgov_email = recEmail;
     if (recPassword) payload.recreationgov_password = recPassword;
-    await update.mutateAsync(payload);
-    setSaved(true);
-    setRecPassword("");
+    try {
+      await update.mutateAsync(payload);
+      setSaved(true);
+      setRecPassword("");
+    } catch {
+      // error surfaced via update.isError in the UI
+    }
   }
 
   return (

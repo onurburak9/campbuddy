@@ -39,6 +39,13 @@ describe("SettingsTab", () => {
     await waitFor(() => expect(patched?.name).toBe("Yosemite Fall"));
   });
 
+  it("shows 'Save failed' and does not throw when PATCH returns 500", async () => {
+    server.use(http.patch("/api/v1/scans/7", () => HttpResponse.json({ detail: "error" }, { status: 500 })));
+    wrap(<SettingsTab scan={scan} />);
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(await screen.findByText(/save failed/i)).toBeInTheDocument();
+  });
+
   it("sends notify_via_email=false when toggling the email switch off", async () => {
     let patched: any = null;
     server.use(http.patch("/api/v1/scans/7", async ({ request }) => {
