@@ -28,7 +28,9 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "127.0.0.1:3000:80"
+      # Host port is configurable to avoid clashing with other apps (e.g. an
+      # existing service on :3000). Set FRONTEND_PORT in .env; defaults to 3100.
+      - "127.0.0.1:${FRONTEND_PORT:-3100}:80"
     depends_on:
       - api
     restart: unless-stopped
