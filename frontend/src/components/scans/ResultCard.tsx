@@ -17,11 +17,12 @@ export function ResultCard({ result }: { result: ScanResult }) {
           {dateRange(result.booking_date, result.booking_end_date)} · {result.campsite_type}
         </p>
         <p className="text-xs text-stone-400">
-          First seen {relativeTime(result.first_seen_at)} · run #{result.scan_run_id}
+          First seen {relativeTime(result.first_seen_at)} · last seen {relativeTime(result.last_seen_at)} · run #{result.scan_run_id}
         </p>
       </div>
       <div className="flex flex-col items-end gap-2">
         <div className="flex gap-1.5">
+          {result.is_available ? <Badge tone="success">Available</Badge> : <Badge tone="neutral">Gone</Badge>}
           {result.cart_added ? <Badge tone="accent">In cart</Badge> : <Badge tone="neutral">Not in cart</Badge>}
           {result.notified && <Badge tone="info">Notified</Badge>}
         </div>

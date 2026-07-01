@@ -63,6 +63,8 @@ export interface ScanResult {
   booking_end_date: string;
   booking_url: string;
   first_seen_at: string;
+  last_seen_at: string;
+  is_available: boolean;
   cart_added: boolean;
   notified: boolean;
 }

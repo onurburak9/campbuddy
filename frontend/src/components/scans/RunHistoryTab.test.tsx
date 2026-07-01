@@ -63,7 +63,7 @@ describe("RunHistoryTab", () => {
         { id: 9, scan_id: 7, started_at: "2026-06-30T11:00:00Z", finished_at: "2026-06-30T11:00:03Z", outcome: "success", sites_found: 1, error_message: null },
       ])),
       http.get("/api/v1/scans/7/runs/9/results", () => HttpResponse.json([
-        { id: 3, scan_run_id: 9, scan_id: 7, campsite_id: "A1", facility_name: "Upper Pines", site_name: "Site 42", campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03", booking_url: "https://x", first_seen_at: "2026-06-30T11:00:00Z", cart_added: false, notified: true },
+        { id: 3, scan_run_id: 9, scan_id: 7, campsite_id: "A1", facility_name: "Upper Pines", site_name: "Site 42", campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03", booking_url: "https://x", first_seen_at: "2026-06-30T11:00:00Z", last_seen_at: "2026-06-30T11:00:00Z", is_available: true, cart_added: false, notified: true },
       ])),
     );
     wrap(<RunHistoryTab scanId={7} />);

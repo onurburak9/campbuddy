@@ -14,6 +14,7 @@ function makeResult(id: number) {
   return { id, scan_run_id: 1, scan_id: 7, campsite_id: String(id), facility_name: "F",
     site_name: `S${id}`, campsite_type: "TENT", booking_date: "2026-07-01",
     booking_end_date: "2026-07-03", booking_url: "x", first_seen_at: "2026-06-30T11:00:00Z",
+    last_seen_at: "2026-06-30T11:00:00Z", is_available: true,
     cart_added: false, notified: false };
 }
 

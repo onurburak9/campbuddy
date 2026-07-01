@@ -15,6 +15,8 @@ const base: ScanResult = {
   booking_end_date: "2026-08-03",
   booking_url: "https://www.recreation.gov/camping/campsites/A1",
   first_seen_at: "2026-06-01T10:00:00Z",
+  last_seen_at: "2026-06-02T10:00:00Z",
+  is_available: true,
   cart_added: true,
   notified: true,
 };
@@ -69,5 +71,22 @@ describe("ResultCard", () => {
     expect(link).toHaveAttribute("href", "https://www.recreation.gov/camping/campsites/A1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("shows 'Available' badge when is_available is true", () => {
+    render(<ResultCard result={base} />);
+    expect(screen.getByText("Available")).toBeInTheDocument();
+    expect(screen.queryByText("Gone")).not.toBeInTheDocument();
+  });
+
+  it("shows 'Gone' badge when is_available is false", () => {
+    render(<ResultCard result={{ ...base, is_available: false }} />);
+    expect(screen.getByText("Gone")).toBeInTheDocument();
+    expect(screen.queryByText("Available")).not.toBeInTheDocument();
+  });
+
+  it("renders 'last seen' text", () => {
+    render(<ResultCard result={base} />);
+    expect(screen.getByText(/last seen/i)).toBeInTheDocument();
   });
 });
