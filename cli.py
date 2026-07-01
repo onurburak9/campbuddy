@@ -103,6 +103,28 @@ def list_scans():
             )
 
 
+@cli.command("list-users")
+def list_users():
+    """List all users, whether they have a web-login password set, and their scan counts."""
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        users = db.query(User).filter(User.deleted_at.is_(None)).all()
+        if not users:
+            click.echo("No users found.")
+            return
+        for u in users:
+            has_pw = "yes" if u.hashed_password else "NO"
+            tg = "yes" if u.telegram_chat_id else "no"
+            scans = (
+                db.query(Scan)
+                .filter(Scan.user_id == u.id, Scan.deleted_at.is_(None))
+                .count()
+            )
+            click.echo(
+                f"[{u.id:3}] {u.email:32} | login-pw={has_pw:3} | telegram={tg:3} | scans={scans} | limit={u.scan_limit}"
+            )
+
+
 @cli.command()
 @click.argument("scan_id", type=int)
 def pause(scan_id: int):

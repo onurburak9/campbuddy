@@ -186,3 +186,35 @@ def test_change_password_fails_when_user_has_no_password(runner, factory):
     )
     assert result.exit_code != 0
     assert "no password" in result.output.lower() or "not set" in result.output.lower()
+
+
+# --- list-users ---
+
+def test_list_users_no_users(runner, factory):
+    result = runner.invoke(cli, ["list-users"])
+    assert result.exit_code == 0
+    assert "No users found." in result.output
+
+
+def test_list_users_shows_password_status(runner, factory):
+    from api.auth import hash_password
+
+    # User with a web-login password
+    with factory() as db:
+        alice = User(email="alice@example.com", hashed_password=hash_password("s3cr3t"))
+        db.add(alice)
+        db.commit()
+
+    # User without a web-login password
+    _seed_user(factory, email="bob@example.com")
+
+    result = runner.invoke(cli, ["list-users"])
+    assert result.exit_code == 0
+    assert "alice@example.com" in result.output
+    assert "bob@example.com" in result.output
+
+    alice_line = next(line for line in result.output.splitlines() if "alice@example.com" in line)
+    bob_line = next(line for line in result.output.splitlines() if "bob@example.com" in line)
+
+    assert "login-pw=yes" in alice_line
+    assert "login-pw=NO" in bob_line
