@@ -4,9 +4,28 @@ import type { Scan } from "../../types";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function ids(v: number[] | null | undefined): string {
-  return v && v.length ? v.join(", ") : "—";
+function IdLinks({ values, base }: { values: number[] | null | undefined; base: (id: number) => string }) {
+  if (!values || !values.length) return <>—</>;
+  return (
+    <span className="inline-flex flex-wrap gap-x-2">
+      {values.map((id) => (
+        <a
+          key={id}
+          href={base(id)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-forest-700 hover:underline dark:text-forest-400"
+        >
+          {id}
+        </a>
+      ))}
+    </span>
+  );
 }
+
+const AREA_URL = (id: number) => `https://www.recreation.gov/gateways/${id}`;
+const CAMPGROUND_URL = (id: number) => `https://www.recreation.gov/camping/campgrounds/${id}`;
+const CAMPSITE_URL = (id: number) => `https://www.recreation.gov/camping/campsites/${id}`;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -32,9 +51,9 @@ export function ConfigCard({ scan }: { scan: Scan }) {
       <h3 className="mb-3 text-sm font-semibold text-stone-800 dark:text-[#EEE]">Configuration</h3>
       <div className="space-y-2">
         <Row label="Provider">{scan.provider}</Row>
-        <Row label="Recreation areas">{ids(scan.rec_area_ids)}</Row>
-        <Row label="Campgrounds">{ids(scan.campground_ids)}</Row>
-        <Row label="Campsites">{ids(scan.campsite_ids)}</Row>
+        <Row label="Recreation areas"><IdLinks values={scan.rec_area_ids} base={AREA_URL} /></Row>
+        <Row label="Campgrounds"><IdLinks values={scan.campground_ids} base={CAMPGROUND_URL} /></Row>
+        <Row label="Campsites"><IdLinks values={scan.campsite_ids} base={CAMPSITE_URL} /></Row>
         <Row label="Search windows">
           <span className="flex flex-wrap gap-1.5">
             {scan.search_windows.map((w, i) => (
