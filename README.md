@@ -146,6 +146,50 @@ When a scan fires and finds availability, you'll see notification logs. Press Ct
 
 ---
 
+## Web UI
+
+CampBuddy includes a React + Vite web interface for managing scans, viewing results, and configuring your account.
+
+### Development (local)
+
+```bash
+cd frontend
+npm install
+npm run dev        # dev server on http://localhost:3000, proxies /api/ to http://localhost:8000
+```
+
+The Vite dev server proxies `/api/` requests to the backend API running on port 8000. Start the API first:
+
+```bash
+# In another terminal (venv active)
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Test the frontend
+
+```bash
+cd frontend
+npm test           # run Vitest unit tests
+npm run lint       # TypeScript type-check
+```
+
+### Build for production
+
+```bash
+cd frontend
+npm run build      # outputs to frontend/dist/
+```
+
+### Run via Docker Compose
+
+```bash
+docker compose up frontend    # builds and serves on http://localhost:3000
+```
+
+The `frontend` service serves the built static assets via nginx on port 3000 and proxies `/api/` requests to the `api` container on the internal Docker network.
+
+---
+
 ## Docker Compose Deployment
 
 Docker Compose runs two containers:
