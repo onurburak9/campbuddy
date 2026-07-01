@@ -35,9 +35,18 @@ describe("ResultsTab (client-side filtering)", () => {
     expect(screen.queryByText("Site 42")).not.toBeInTheDocument();
 
     await userEvent.clear(screen.getByPlaceholderText(/search/i));
-    // Facility dropdown → Sunset (first combobox is facility)
-    const [facilitySelect] = screen.getAllByRole("combobox");
-    await userEvent.selectOptions(facilitySelect, "Sunset").catch(() => {});
+    // Facility dropdown → Sunset (locate via its unique "All campgrounds" option)
+    const facilitySelect = screen.getByRole("option", { name: "All campgrounds" }).closest("select")!;
+    await userEvent.selectOptions(facilitySelect, "Sunset");
+    await waitFor(() => expect(screen.getByText("Site 7")).toBeInTheDocument());
+    expect(screen.queryByText("Loop A")).not.toBeInTheDocument();
+    expect(screen.queryByText("Site 42")).not.toBeInTheDocument();
+  });
+
+  it("shows the no-results-yet message when the API returns an empty array", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json([])));
+    wrap(<ResultsTab scanId={7} />);
+    await screen.findByText(/no results yet/i);
   });
 
   it("shows the no-match message when filters exclude everything", async () => {
