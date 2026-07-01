@@ -186,12 +186,48 @@ def test_list_results_returns_empty(auth_client):
     assert resp.json() == []
 
 
+def test_get_stats_returns_zeros_for_new_scan(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sites_found"] == 0
+    assert data["in_cart"] == 0
+    assert data["total_runs"] == 0
+    assert data["success_rate"] == 0
+
+
+def test_get_stats_returns_404_for_wrong_owner(auth_client):
+    client, _ = auth_client
+    with get_db(api_db.get_factory()) as db:
+        other = User(email="other2@e.com", hashed_password=hash_password("pw"), scan_limit=5)
+        db.add(other)
+        db.flush()
+        other_id = other.id
+    scan_id = _make_scan(other_id)
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats")
+    assert resp.status_code == 404
+
+
+def test_get_stats_returns_404_for_missing_scan(auth_client):
+    client, _ = auth_client
+    resp = client.get("/api/v1/scans/9999/stats")
+    assert resp.status_code == 404
+
+
+def test_get_stats_requires_auth(client):
+    resp = client.get("/api/v1/scans/1/stats")
+    assert resp.status_code == 401
+
+
 def test_all_scan_routes_require_auth(client):
     for path in [
         "/api/v1/scans",
         "/api/v1/scans/1",
         "/api/v1/scans/1/runs",
         "/api/v1/scans/1/results",
+        "/api/v1/scans/1/stats",
     ]:
         resp = client.get(path)
         assert resp.status_code == 401, f"GET {path} should return 401"
@@ -208,3 +244,40 @@ def test_all_scan_routes_require_auth(client):
     assert resp.status_code == 401, "PATCH /api/v1/scans/1 should return 401"
     resp = client.delete("/api/v1/scans/1")
     assert resp.status_code == 401, "DELETE /api/v1/scans/1 should return 401"
+
+
+def test_runs_outcome_filter(auth_client, scan_with_runs):
+    client, _ = auth_client
+    r = client.get(f"/api/v1/scans/{scan_with_runs.id}/runs?outcome=success")
+    assert r.status_code == 200
+    assert all(item["outcome"] == "success" for item in r.json())
+
+
+def test_run_results_endpoint(auth_client, scan_with_results):
+    client, _ = auth_client
+    scan, run = scan_with_results
+    r = client.get(f"/api/v1/scans/{scan.id}/runs/{run.id}/results")
+    assert r.status_code == 200
+    body = r.json()
+    assert body and all(item["scan_run_id"] == run.id for item in body)
+
+
+def test_run_results_404_for_unknown_run(auth_client, scan_with_results):
+    client, _ = auth_client
+    scan, _ = scan_with_results
+    r = client.get(f"/api/v1/scans/{scan.id}/runs/999999/results")
+    assert r.status_code == 404
+
+
+def test_runs_started_after_filter(auth_client, scan_with_runs):
+    client, _ = auth_client
+    scan = scan_with_runs
+    from datetime import datetime, timezone, timedelta
+    from urllib.parse import urlencode
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    cutoff = cutoff_dt.isoformat()
+    params = urlencode({"started_after": cutoff})
+    r = client.get(f"/api/v1/scans/{scan.id}/runs?{params}")
+    assert r.status_code == 200
+    for item in r.json():
+        assert item["started_at"] >= cutoff

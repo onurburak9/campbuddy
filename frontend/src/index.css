@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-sand-50 text-stone-900 antialiased dark:bg-[#0D0D0D] dark:text-[#EEEEEE];
+  }
+}

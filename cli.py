@@ -262,6 +262,51 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
                    f"scan_limit={user.scan_limit}")
 
 
+@cli.command("set-password")
+@click.argument("email")
+@click.option("--password", default=None, help="New login password. If omitted, a secure prompt is shown.")
+def set_password(email: str, password: str):
+    """Set (or reset) the web UI login password for a user identified by EMAIL."""
+    from api.auth import hash_password
+    if password is None:
+        password = click.prompt("New password", hide_input=True, confirmation_prompt=True)
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+        if not user:
+            click.echo(f"Error: User '{email}' not found.")
+            raise SystemExit(1)
+        user.hashed_password = hash_password(password)
+    click.echo(f"Password set for {email}.")
+
+
+@cli.command("change-password")
+@click.argument("email")
+@click.option("--current-password", default=None, help="Current login password.")
+@click.option("--new-password", default=None, help="New login password.")
+def change_password(email: str, current_password: str, new_password: str):
+    """Change the web UI login password for EMAIL, requiring the current password first."""
+    from api.auth import hash_password, verify_password
+    if current_password is None:
+        current_password = click.prompt("Current password", hide_input=True)
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+        if not user:
+            click.echo(f"Error: User '{email}' not found.")
+            raise SystemExit(1)
+        if not user.hashed_password:
+            click.echo(f"Error: User '{email}' has no password set. Use set-password instead.")
+            raise SystemExit(1)
+        if not verify_password(current_password, user.hashed_password):
+            click.echo("Error: Current password is incorrect.")
+            raise SystemExit(1)
+        if new_password is None:
+            new_password = click.prompt("New password", hide_input=True, confirmation_prompt=True)
+        user.hashed_password = hash_password(new_password)
+    click.echo(f"Password changed for {email}.")
+
+
 @cli.command("delete-user")
 @click.argument("user_id", type=int)
 @click.confirmation_option(prompt="Soft-delete user and their scans? (history kept for 180 days)")

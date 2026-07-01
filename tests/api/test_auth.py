@@ -52,6 +52,27 @@ def test_me_returns_user_info(auth_client):
     assert data["email"] == "user@example.com"
     assert data["scan_limit"] == 5
     assert data["scans_used"] == 0
+    assert data["has_telegram"] is False
+
+
+def test_me_has_telegram_true_when_telegram_chat_id_set(auth_client):
+    client, info = auth_client
+    with get_db(api_db.get_factory()) as db:
+        user = db.query(User).filter(User.id == info["id"]).first()
+        user.telegram_chat_id = "123456789"
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["has_telegram"] is True
+
+
+def test_me_has_telegram_false_when_telegram_chat_id_empty_string(auth_client):
+    client, info = auth_client
+    with get_db(api_db.get_factory()) as db:
+        user = db.query(User).filter(User.id == info["id"]).first()
+        user.telegram_chat_id = ""
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["has_telegram"] is False
 
 
 def test_me_returns_401_without_cookie(client):

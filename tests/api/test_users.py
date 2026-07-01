@@ -4,6 +4,31 @@ import api.database as api_db
 from api.auth import hash_password
 
 
+def test_get_profile_returns_user_fields(auth_client):
+    client, info = auth_client
+    resp = client.get("/api/v1/users/me")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == info["id"]
+    assert data["email"] == "user@example.com"
+    assert data["scan_limit"] == 5
+    assert "telegram_chat_id" in data
+    assert "recreationgov_email" in data
+
+
+def test_get_profile_does_not_expose_password(auth_client):
+    client, _ = auth_client
+    resp = client.get("/api/v1/users/me")
+    body = resp.json()
+    assert "recreationgov_password" not in body
+    assert "hashed_password" not in body
+
+
+def test_get_profile_requires_auth(client):
+    resp = client.get("/api/v1/users/me")
+    assert resp.status_code == 401
+
+
 def test_patch_profile_updates_email(auth_client):
     client, _ = auth_client
     resp = client.patch("/api/v1/users/me", json={"email": "updated@example.com"})

@@ -12,3 +12,6 @@ dist/
 build/
 .playwright-mcp/
 .claude/worktrees/
+.superpowers/brainstorm/
+frontend/node_modules
+frontend/dist

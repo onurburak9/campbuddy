@@ -25,6 +25,14 @@ services:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
 
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   playwright:
     build:
       context: .
