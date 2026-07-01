@@ -153,12 +153,12 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         # Availability lifecycle: bump last_seen for keys present this run,
         # flip previously-available keys that dropped out to unavailable.
         # Runs even when `sites` is empty (everything then goes unavailable).
-        now = _now()
+        availability_now = _now()
         with get_db(session_factory) as db:
             rows = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
             for r in rows:
                 if (r.campsite_id, r.booking_date) in current_keys:
-                    r.last_seen_at = now
+                    r.last_seen_at = availability_now
                     r.is_available = True
                 elif r.is_available:
                     r.is_available = False
