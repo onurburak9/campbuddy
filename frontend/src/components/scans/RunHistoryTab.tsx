@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useScanRuns, RUNS_PAGE_SIZE } from "../../hooks/useRuns";
 import { RunRow } from "./RunRow";
 import { Pagination } from "../ui/Pagination";
@@ -29,8 +29,9 @@ export function RunHistoryTab({ scanId }: { scanId: number }) {
   const [pageSize, setPageSize] = useState(RUNS_PAGE_SIZE);
   const [foundOnly, setFoundOnly] = useState(false);
   const [range, setRange] = useState("all");
+  const startedAfter = useMemo(() => cutoffISO(range), [range]);
   const { data: runs, isLoading } = useScanRuns(
-    scanId, page, pageSize, foundOnly ? "success" : undefined, cutoffISO(range),
+    scanId, page, pageSize, foundOnly ? "success" : undefined, startedAfter,
   );
 
   return (

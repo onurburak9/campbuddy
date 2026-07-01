@@ -38,6 +38,25 @@ describe("RunHistoryTab", () => {
     expect(screen.getByText(/provider timeout/i)).toBeInTheDocument();
   });
 
+  it("does not refetch in a loop when a time range is selected", async () => {
+    let calls = 0;
+    server.use(http.get("/api/v1/scans/7/runs", () => {
+      calls += 1;
+      return HttpResponse.json([
+        { id: 1, scan_id: 7, started_at: "2026-06-30T11:00:00Z", finished_at: "2026-06-30T11:00:05Z", outcome: "success", sites_found: 1, error_message: null },
+      ]);
+    }));
+    wrap(<RunHistoryTab scanId={7} />);
+    // select "Last 7 days" from the range select (first combobox)
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[0], "7d");
+    // wait until settled (a run row appears — not stuck on spinner)
+    await waitFor(() => expect(screen.getByText(/Success/)).toBeInTheDocument());
+    const after = calls;
+    await new Promise((r) => setTimeout(r, 150));
+    expect(calls).toBe(after); // no further refetching → loop is gone
+  });
+
   it("expands a run to show its discovered sites", async () => {
     server.use(
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([
