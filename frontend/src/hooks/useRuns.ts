@@ -4,10 +4,16 @@ import { queryKeys } from "./queryKeys";
 
 const PAGE_SIZE = 20;
 
-export function useScanRuns(scanId: number | null, page: number, pageSize: number = PAGE_SIZE, outcome?: string) {
+export function useScanRuns(
+  scanId: number | null,
+  page: number,
+  pageSize: number = PAGE_SIZE,
+  outcome?: string,
+  startedAfter?: string,
+) {
   return useQuery({
-    queryKey: scanId ? queryKeys.runs(scanId, page, pageSize, outcome) : ["scans", "none", "runs", page],
-    queryFn: () => runs.list(scanId as number, page, pageSize, outcome),
+    queryKey: scanId ? queryKeys.runs(scanId, page, pageSize, outcome, startedAfter) : ["scans", "none", "runs", page],
+    queryFn: () => runs.list(scanId as number, page, pageSize, outcome, startedAfter),
     enabled: scanId != null,
   });
 }
