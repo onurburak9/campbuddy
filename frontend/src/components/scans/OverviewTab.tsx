@@ -4,7 +4,7 @@ import { useScanResults } from "../../hooks/useResults";
 import { relativeTime } from "../../lib/format";
 import { StatsRow } from "./StatsRow";
 import { RunHealthBar } from "./RunHealthBar";
-import { SearchWindowsList } from "./SearchWindowsList";
+import { ConfigCard } from "./ConfigCard";
 import type { Scan } from "../../types";
 
 export function OverviewTab({ scan }: { scan: Scan }) {
@@ -31,7 +31,7 @@ export function OverviewTab({ scan }: { scan: Scan }) {
         <h3 className="mb-2 text-sm font-semibold text-stone-700 dark:text-[#CCC]">Recent Run Health</h3>
         <RunHealthBar runs={runs} />
       </div>
-      <SearchWindowsList windows={scan.search_windows} />
+      <ConfigCard scan={scan} />
     </div>
   );
 }
