@@ -143,6 +143,8 @@ class ScanResult(Base):
     booking_end_date: Mapped[date] = mapped_column(Date, nullable=False)
     booking_url: Mapped[str] = mapped_column(String, nullable=False)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     cart_added: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cart_added_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
