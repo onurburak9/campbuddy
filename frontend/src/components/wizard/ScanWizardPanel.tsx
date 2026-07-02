@@ -39,11 +39,14 @@ export function ScanWizardPanel({ onClose, onCreated }: {
 
   return (
     <section className="flex flex-1 overflow-hidden">
-      <div className="w-56 border-r border-sand-200 p-6 dark:border-[#222]">
+      <div className="hidden w-56 border-r border-sand-200 p-6 dark:border-[#222] md:block">
         <h2 className="mb-6 text-sm font-semibold text-stone-800 dark:text-[#EEE]">New Scan</h2>
         <VerticalStepIndicator steps={STEPS} current={step} />
       </div>
-      <div className="flex flex-1 flex-col overflow-y-auto p-6">
+      <div className="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+        <p className="mb-4 text-sm font-medium text-stone-600 dark:text-[#AAA] md:hidden">
+          Step {step + 1} of {STEPS.length} · {STEPS[step]}
+        </p>
         <div className="max-w-xl flex-1">
           {step === 0 && <ProviderSitesFields state={form.state} set={form.set} />}
           {step === 1 && <DatesFiltersFields state={form.state} set={form.set} />}

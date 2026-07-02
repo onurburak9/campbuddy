@@ -37,4 +37,12 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: /create scan/i }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
   });
+
+  it("shows a compact mobile step indicator that advances", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    expect(screen.getByText(/step 1 of 3 · provider & sites/i)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/recreation area ids/i), "2991");
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
+  });
 });
