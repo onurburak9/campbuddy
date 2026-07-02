@@ -90,6 +90,7 @@ main.py         — scheduler entry point
 - Follow naming, session, and datetime conventions — see [Code Conventions](docs/agents/code-conventions.md)
 - When changing `db/models.py`, always generate a migration in the same commit — see [Schema Changes](docs/agents/schema-changes.md)
 - When adding a new campground provider, follow the four-step checklist — see [Adding a Provider](docs/agents/adding-provider.md)
+- To debug runtime behaviour from logs/metrics (Grafana Cloud via MCP), see [Debugging with Grafana](docs/agents/debugging-with-grafana.md)
 
 ## Architecture
 
