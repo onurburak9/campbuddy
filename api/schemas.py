@@ -156,6 +156,8 @@ class ScanResultResponse(BaseModel):
     booking_end_date: date
     booking_url: str
     first_seen_at: datetime
+    last_seen_at: datetime
+    is_available: bool
     cart_added: bool
     notified: bool
 

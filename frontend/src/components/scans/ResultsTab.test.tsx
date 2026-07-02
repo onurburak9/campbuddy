@@ -10,6 +10,7 @@ const mk = (id: number, facility: string, type: string, site: string) => ({
   id, scan_run_id: 9, scan_id: 7, campsite_id: `C${id}`, facility_name: facility,
   site_name: site, campsite_type: type, booking_date: "2026-07-01",
   booking_end_date: "2026-07-03", booking_url: "https://x", first_seen_at: "2026-06-30T11:00:00Z",
+  last_seen_at: "2026-06-30T11:00:00Z", is_available: true,
   cart_added: false, notified: true,
 });
 const rows = [

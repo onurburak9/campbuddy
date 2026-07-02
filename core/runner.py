@@ -17,6 +17,10 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _as_date(value):
+    return value.date() if hasattr(value, "date") else value
+
+
 def run_scan(scan_id: int, session_factory, settings) -> None:
     # Transaction 1 (fast): load config, start run
     with get_db(session_factory) as db:
@@ -50,20 +54,16 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
             run.finished_at = _now()
         return
 
+    current_keys = {
+        (str(s.campsite_id), _as_date(s.booking_date)) for s in sites
+    }
+
     try:
         digest_batch: list[tuple[int, NotificationPayload]] = []
 
         for site in sites:
-            booking_date = (
-                site.booking_date.date()
-                if hasattr(site.booking_date, "date")
-                else site.booking_date
-            )
-            booking_end_date = (
-                site.booking_end_date.date()
-                if hasattr(site.booking_end_date, "date")
-                else site.booking_end_date
-            )
+            booking_date = _as_date(site.booking_date)
+            booking_end_date = _as_date(site.booking_end_date)
 
             # Transaction 2 (fast): check duplicate, write result
             with get_db(session_factory) as db:
@@ -79,6 +79,7 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     )
                     if exists:
                         continue
+                seen = _now()
                 result = ScanResult(
                     scan_run_id=run_id,
                     scan_id=scan_id,
@@ -89,7 +90,9 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     booking_date=booking_date,
                     booking_end_date=booking_end_date,
                     booking_url=site.booking_url,
-                    first_seen_at=_now(),
+                    first_seen_at=seen,
+                    last_seen_at=seen,
+                    is_available=True,
                 )
                 db.add(result)
                 db.flush()
@@ -146,6 +149,19 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                     )
             except Exception as e:
                 logger.error("Digest notify failed for scan %d: %s", scan_id, e)
+
+        # Availability lifecycle: bump last_seen for keys present this run,
+        # flip previously-available keys that dropped out to unavailable.
+        # Runs even when `sites` is empty (everything then goes unavailable).
+        availability_now = _now()
+        with get_db(session_factory) as db:
+            rows = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
+            for r in rows:
+                if (r.campsite_id, r.booking_date) in current_keys:
+                    r.last_seen_at = availability_now
+                    r.is_available = True
+                elif r.is_available:
+                    r.is_available = False
 
         # Transaction 4 (fast): finalize run
         with get_db(session_factory) as db:

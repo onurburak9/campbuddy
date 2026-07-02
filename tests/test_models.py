@@ -101,6 +101,7 @@ def test_scan_result_defaults(db):
     )
     db.add(run)
     db.flush()
+    now = _now()
     result = ScanResult(
         scan_run_id=run.id,
         scan_id=scan.id,
@@ -111,7 +112,8 @@ def test_scan_result_defaults(db):
         booking_date=date(2026, 7, 3),
         booking_end_date=date(2026, 7, 6),
         booking_url="https://www.recreation.gov/camping/campsites/10357088",
-        first_seen_at=_now(),
+        first_seen_at=now,
+        last_seen_at=now,
     )
     db.add(result)
     db.commit()
@@ -119,6 +121,8 @@ def test_scan_result_defaults(db):
     assert result.cart_added is False
     assert result.notified is False
     assert result.cart_added_at is None
+    assert result.last_seen_at == now.replace(tzinfo=None)
+    assert result.is_available is True  # column default applied on insert
 
 
 def test_user_delete_cascades_to_scans_runs_results(db):
@@ -136,7 +140,7 @@ def test_user_delete_cascades_to_scans_runs_results(db):
         scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
         facility_name="F", site_name="1", campsite_type="T",
         booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
-        booking_url="u", first_seen_at=_now(),
+        booking_url="u", first_seen_at=_now(), last_seen_at=_now(),
     )
     db.add(result)
     db.commit()
@@ -181,7 +185,7 @@ def test_user_soft_delete_preserves_scans_runs_results(db):
         scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
         facility_name="F", site_name="1", campsite_type="T",
         booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
-        booking_url="u", first_seen_at=_now(),
+        booking_url="u", first_seen_at=_now(), last_seen_at=_now(),
     )
     db.add(result)
     db.commit()
@@ -223,7 +227,7 @@ def test_scan_soft_delete_preserves_history(db):
         scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
         facility_name="F", site_name="1", campsite_type="T",
         booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
-        booking_url="u", first_seen_at=_now(),
+        booking_url="u", first_seen_at=_now(), last_seen_at=_now(),
     )
     db.add(result)
     db.commit()

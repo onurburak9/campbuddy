@@ -34,6 +34,7 @@ def _make_result(db, scan_id, run_id):
         booking_end_date=date(2026, 7, 6),
         booking_url="https://example.com",
         first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
     )
     db.add(r)
     db.flush()

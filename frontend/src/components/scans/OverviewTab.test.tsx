@@ -18,7 +18,7 @@ describe("OverviewTab", () => {
     server.use(
       http.get("/api/v1/scans/7/stats", () => HttpResponse.json({ sites_found: 1, in_cart: 0, total_runs: 5, success_rate: 80 })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([{ id: 9, scan_id: 7, started_at: "2026-06-30T11:00:00Z", finished_at: "2026-06-30T11:00:03Z", outcome: "success", sites_found: 1, error_message: null }])),
-      http.get("/api/v1/scans/7/results", () => HttpResponse.json([{ id: 3, scan_run_id: 9, scan_id: 7, campsite_id: "A1", facility_name: "F", site_name: "S", campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03", booking_url: "x", first_seen_at: "2026-06-30T11:00:00Z", cart_added: false, notified: true }])),
+      http.get("/api/v1/scans/7/results", () => HttpResponse.json([{ id: 3, scan_run_id: 9, scan_id: 7, campsite_id: "A1", facility_name: "F", site_name: "S", campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03", booking_url: "x", first_seen_at: "2026-06-30T11:00:00Z", last_seen_at: "2026-06-30T11:00:00Z", is_available: true, cart_added: false, notified: true }])),
     );
     wrap(<OverviewTab scan={scan} />);
     await waitFor(() => expect(screen.getByText(/Last checked/i)).toBeInTheDocument());

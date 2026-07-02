@@ -131,6 +131,7 @@ def scan_with_results(user_in_db):
                 booking_end_date=date(2026, 7, 6),
                 booking_url="https://example.com",
                 first_seen_at=datetime.now(timezone.utc),
+                last_seen_at=datetime.now(timezone.utc),
             )
             db.add(result)
         db.flush()

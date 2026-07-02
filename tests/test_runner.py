@@ -188,3 +188,66 @@ def test_digest_failure_leaves_results_unnotified(factory, scan_id, settings, mo
     with factory() as db:
         result = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
         assert result.notified is False
+
+
+def test_re_find_updates_last_seen_at(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.attempt_cart_add", return_value=False)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_digest")
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        first = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
+        first_seen = first.first_seen_at
+        seen_after_run1 = first.last_seen_at
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        rows = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
+        assert len(rows) == 1  # dedup: still one row
+        r = rows[0]
+        assert r.first_seen_at == first_seen  # unchanged
+        assert r.last_seen_at > seen_after_run1  # bumped on re-find
+        assert r.is_available is True
+
+
+def test_dropout_flips_is_available_false(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", side_effect=[[make_site()], []])
+    mocker.patch("core.runner.attempt_cart_add", return_value=False)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_digest")
+    run_scan(scan_id, factory, settings)  # site present
+    run_scan(scan_id, factory, settings)  # site gone (empty results)
+    with factory() as db:
+        r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
+        assert r.is_available is False
+
+
+def test_reappearance_flips_is_available_true(factory, scan_id, settings, mocker):
+    mocker.patch(
+        "core.runner.check_availability",
+        side_effect=[[make_site()], [], [make_site()]],
+    )
+    mocker.patch("core.runner.attempt_cart_add", return_value=False)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_digest")
+    run_scan(scan_id, factory, settings)  # present
+    run_scan(scan_id, factory, settings)  # gone
+    with factory() as db:
+        assert db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one().is_available is False
+    run_scan(scan_id, factory, settings)  # back
+    with factory() as db:
+        r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
+        assert r.is_available is True
+
+
+def test_new_row_stamps_last_seen_and_available(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.attempt_cart_add", return_value=False)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_digest")
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
+        assert r.last_seen_at is not None
+        assert r.last_seen_at >= r.first_seen_at
+        assert r.is_available is True
