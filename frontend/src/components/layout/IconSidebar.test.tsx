@@ -15,4 +15,25 @@ describe("IconSidebar", () => {
     await userEvent.click(screen.getByRole("button", { name: /theme/i }));
     expect(toggle).toHaveBeenCalledOnce();
   });
+
+  it("closes on backdrop click when open", async () => {
+    const onClose = vi.fn();
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} open onClose={onClose} /></MemoryRouter>);
+    await userEvent.click(screen.getByTestId("sidebar-backdrop"));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("closes on Escape when open", async () => {
+    const onClose = vi.fn();
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} open onClose={onClose} /></MemoryRouter>);
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("closes when a nav item is selected", async () => {
+    const onClose = vi.fn();
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} open onClose={onClose} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("link", { name: /settings/i }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });
