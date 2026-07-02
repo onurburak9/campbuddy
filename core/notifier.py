@@ -209,31 +209,100 @@ def send_telegram_digest(chat_id: str, payloads: list[NotificationPayload], sett
     logger.info("Digest Telegram sent to %s (%d sites)", chat_id, len(payloads))
 
 
-def notify(scan, payload: NotificationPayload, settings) -> None:
+def _available_subject(payloads: list[NotificationPayload]) -> str:
+    n = len(payloads)
+    noun = "site" if n == 1 else "sites"
+    facilities = list(dict.fromkeys(p.facility_name for p in payloads))
+    header = facilities[0] if len(facilities) == 1 else f"{len(facilities)} campgrounds"
+    return f"{n} {noun} available — {header}"
+
+
+def _available_body(payloads: list[NotificationPayload], auto_book: bool) -> str:
+    n = len(payloads)
+    lines = [f"{n} campsites available — book now\n"]
+    by_facility: dict[str, list[NotificationPayload]] = {}
+    for p in payloads:
+        by_facility.setdefault(p.facility_name, []).append(p)
+    for facility, group in by_facility.items():
+        lines.append("")
+        lines.append(facility)
+        for p in group:
+            lines.append(f"  Site {p.site_name} ({p.campsite_type})  {_format_dates(p)}  {p.booking_url}")
+    if auto_book:
+        lines.append("\nAuto-booking is in progress — a follow-up email will confirm which sites made it into your cart.")
+    return "\n".join(lines) + "\n"
+
+
+def send_email_available(to: str, payloads: list[NotificationPayload], settings, auto_book: bool) -> None:
+    if not payloads:
+        return
+    msg = MIMEText(_available_body(payloads, auto_book), "plain", "utf-8")
+    msg["From"] = settings.smtp_from
+    msg["To"] = to
+    msg["Subject"] = _available_subject(payloads)
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        server.starttls()
+        server.login(settings.smtp_user, settings.smtp_password)
+        server.sendmail(settings.smtp_from, to, msg.as_string())
+    logger.info("Available email sent to %s (%d sites)", to, len(payloads))
+
+
+def send_telegram_available(chat_id: str, payloads: list[NotificationPayload], settings, auto_book: bool) -> None:
+    if not payloads or not settings.telegram_bot_token:
+        return
+    n = len(payloads)
+    noun = "site" if n == 1 else "sites"
+    lines = [f"🏕 {n} {noun} available — book now", ""]
+    for p in payloads:
+        lines.append(f"  Site {p.site_name} — {p.booking_url}")
+    if auto_book:
+        lines.append("\n⏳ Auto-booking in progress — follow-up coming.")
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+    resp = requests.post(url, json={"chat_id": chat_id, "text": "\n".join(lines)}, timeout=10)
+    if not resp.ok:
+        raise RuntimeError(f"Telegram API returned {resp.status_code}")
+
+
+def notify_available(scan, payloads: list[NotificationPayload], settings) -> None:
+    if not payloads:
+        return
     if scan.notify_via_email and scan.user.email:
         try:
-            send_email(scan.user.email, payload, settings)
+            send_email_available(scan.user.email, payloads, settings, scan.auto_book)
         except Exception as e:
-            logger.error("Email notification failed: %s", e)
-
+            logger.error("Available email failed: %s", e)
     if scan.notify_via_telegram and scan.user.telegram_chat_id:
         try:
-            send_telegram(scan.user.telegram_chat_id, payload, settings)
+            send_telegram_available(scan.user.telegram_chat_id, payloads, settings, scan.auto_book)
         except Exception as e:
-            logger.error("Telegram notification failed: %s", e)
+            logger.error("Available Telegram failed: %s", e)
 
 
-def notify_digest(scan, payloads: list[NotificationPayload], settings) -> None:
+def notify_cart_results(scan, payloads: list[NotificationPayload], settings, sidecar_available: bool = True) -> None:
     if not payloads:
+        return
+    if not sidecar_available:
+        # Nothing was carted; reuse the "available" phrasing but flag the outage.
+        if scan.notify_via_email and scan.user.email:
+            try:
+                send_email_available(scan.user.email, payloads, settings, auto_book=False)
+            except Exception as e:
+                logger.error("Cart-results (unavailable) email failed: %s", e)
+        if scan.notify_via_telegram and scan.user.telegram_chat_id:
+            try:
+                send_telegram_available(scan.user.telegram_chat_id, payloads, settings, auto_book=False)
+            except Exception as e:
+                logger.error("Cart-results (unavailable) Telegram failed: %s", e)
         return
     if scan.notify_via_email and scan.user.email:
         try:
             send_email_digest(scan.user.email, payloads, settings)
         except Exception as e:
-            logger.error("Digest email failed: %s", e)
-
+            logger.error("Cart-results email failed: %s", e)
     if scan.notify_via_telegram and scan.user.telegram_chat_id:
         try:
             send_telegram_digest(scan.user.telegram_chat_id, payloads, settings)
         except Exception as e:
-            logger.error("Digest Telegram failed: %s", e)
+            logger.error("Cart-results Telegram failed: %s", e)
+
+

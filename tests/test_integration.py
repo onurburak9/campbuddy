@@ -48,6 +48,7 @@ def seed(factory, fernet_key):
             notify_via_email=True,
             notify_via_telegram=False,
             notify_on_new_only=True,
+            auto_book=True,
             status="active",
         )
         db.add(scan)
@@ -71,8 +72,13 @@ def make_site():
 def test_full_scan_cycle(factory, settings, fernet_key, mocker):
     scan_id = seed(factory, fernet_key)
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=True)
-    mocker.patch("core.runner.notify")
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch(
+        "core.runner.attempt_cart_add_batch",
+        return_value=[{"success": True, "error": None}],
+    )
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.notify_cart_results")
 
     run_scan(scan_id, factory, settings)
 

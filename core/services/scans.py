@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from db.models import Scan, ScanStatus, User
-from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState
+from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed
 
 
 def _now():
@@ -11,8 +11,15 @@ _UPDATABLE = {
     "name", "polling_interval", "rec_area_ids", "campground_ids",
     "campsite_ids", "search_windows", "nights", "days_of_week",
     "weekends_only", "notify_via_email", "notify_via_telegram",
-    "notify_on_new_only",
+    "notify_on_new_only", "auto_book",
 }
+
+
+def _require_creds_for_autobook(user, enabled: bool) -> None:
+    if enabled and not (user.recreationgov_email and user.recreationgov_password):
+        raise ValidationFailed(
+            "auto_book requires Recreation.gov email and password on your profile"
+        )
 
 
 def list_scans(db, user_id: int) -> list:
@@ -44,6 +51,7 @@ def create_scan(db, user_id: int, data: dict) -> Scan:
     )
     if active_count >= user.scan_limit:
         raise LimitExceeded(f"Scan limit of {user.scan_limit} reached")
+    _require_creds_for_autobook(user, bool(data.get("auto_book", False)))
     scan = Scan(user_id=user_id, **data)
     db.add(scan)
     db.flush()
@@ -52,6 +60,8 @@ def create_scan(db, user_id: int, data: dict) -> Scan:
 
 def update_scan(db, scan_id: int, user_id: int, data: dict) -> Scan:
     scan = get_scan(db, scan_id, user_id)
+    effective_auto_book = data.get("auto_book", scan.auto_book)
+    _require_creds_for_autobook(scan.user, bool(effective_auto_book))
     for key, value in data.items():
         if key not in _UPDATABLE:
             continue

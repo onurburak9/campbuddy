@@ -80,28 +80,30 @@ def test_run_writes_scan_run_on_error(factory, scan_id, settings, mocker):
         assert "boom" in run.error_message
 
 
-def test_run_saves_result_notifies_and_marks_cart(factory, scan_id, settings, mocker):
+def test_run_saves_result_and_marks_cart_when_autobook_on(factory, scan_id, settings, mocker):
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True})
+        db.commit()
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=True)
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.attempt_cart_add_batch", return_value=[{"success": True, "error": None}])
     mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mock_notify = mocker.patch("core.runner.notify")
+    mock_notify_available = mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.notify_cart_results")
     run_scan(scan_id, factory, settings)
     with factory() as db:
         result = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
         assert result.cart_added is True
         assert result.notified is True
-    mock_notify.assert_called_once()
+    mock_notify_available.assert_called_once()
 
 
 def test_dedup_skips_same_site_same_date(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mock_notify = mocker.patch("core.runner.notify")
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
+    mock_notify_available = mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)
     run_scan(scan_id, factory, settings)
-    assert mock_notify.call_count == 0
-    assert mock_notify_digest.call_count == 1  # only on first run; second run digest_batch is empty
+    assert mock_notify_available.call_count == 1  # second run: dedup, no new items, no email
 
 
 def test_run_skips_deleted_scan(factory, scan_id, settings, mocker):
@@ -121,56 +123,53 @@ def test_dedup_notifies_same_site_different_date(factory, scan_id, settings, moc
     site_a = make_site(check_in=date(2026, 7, 3))
     site_b = make_site(check_in=date(2026, 7, 10))
     mocker.patch("core.runner.check_availability", side_effect=[[site_a], [site_b]])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mock_notify = mocker.patch("core.runner.notify")
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
+    mock_notify_available = mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)
     run_scan(scan_id, factory, settings)
-    assert mock_notify.call_count == 0
-    assert mock_notify_digest.call_count == 2  # once per run, each with 1 payload
-    second_call_payloads = mock_notify_digest.call_args_list[1].args[1]
+    assert mock_notify_available.call_count == 2  # once per run, each with 1 payload
+    second_call_payloads = mock_notify_available.call_args_list[1].args[1]
     assert len(second_call_payloads) == 1
 
 
-def test_non_carted_site_routes_to_digest(factory, scan_id, settings, mocker):
-    mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mock_notify = mocker.patch("core.runner.notify")
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
-    run_scan(scan_id, factory, settings)
-    mock_notify.assert_not_called()
-    mock_notify_digest.assert_called_once()
-    _, (_, payloads, _), _ = mock_notify_digest.mock_calls[0]
-    assert len(payloads) == 1
-    assert payloads[0].cart_added is False
-
-
-def test_mixed_carted_and_non_carted_split_routing(factory, scan_id, settings, mocker):
+def test_mixed_cart_add_results_recorded_and_reported(factory, scan_id, settings, mocker):
     site_a = make_site(campsite_id="111")
     site_b = make_site(campsite_id="222")
     site_c = make_site(campsite_id="333")
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True})
+        db.commit()
     mocker.patch("core.runner.check_availability", return_value=[site_a, site_b, site_c])
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
     mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.attempt_cart_add", side_effect=[True, False, True])
-    mock_notify = mocker.patch("core.runner.notify")
-    mock_notify_digest = mocker.patch("core.runner.notify_digest")
+    mocker.patch(
+        "core.runner.attempt_cart_add_batch",
+        return_value=[
+            {"success": True, "error": None},
+            {"success": False, "error": "boom"},
+            {"success": True, "error": None},
+        ],
+    )
+    mock_cart_results = mocker.patch("core.runner.notify_cart_results")
     run_scan(scan_id, factory, settings)
-    assert mock_notify.call_count == 2
-    assert mock_notify_digest.call_count == 1
-    digest_payloads = mock_notify_digest.call_args[0][1]
-    assert len(digest_payloads) == 1
-    assert digest_payloads[0].cart_added is False
+    with factory() as db:
+        results = {
+            r.campsite_id: r
+            for r in db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
+        }
+        assert results["111"].cart_added is True
+        assert results["222"].cart_added is False
+        assert results["333"].cart_added is True
+    mock_cart_results.assert_called_once()
+    cart_payloads = mock_cart_results.call_args[0][1]
+    assert sorted(p.cart_added for p in cart_payloads) == [False, True, True]
 
 
-
-def test_digest_send_marks_all_results_notified(factory, scan_id, settings, mocker):
+def test_available_send_marks_all_results_notified(factory, scan_id, settings, mocker):
     site_a = make_site(campsite_id="111")
     site_b = make_site(campsite_id="222")
     mocker.patch("core.runner.check_availability", return_value=[site_a, site_b])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest")
+    mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)
     with factory() as db:
         results = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
@@ -179,22 +178,9 @@ def test_digest_send_marks_all_results_notified(factory, scan_id, settings, mock
         assert all(r.notified_at is not None for r in results)
 
 
-def test_digest_failure_leaves_results_unnotified(factory, scan_id, settings, mocker):
-    mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest", side_effect=RuntimeError("digest failed"))
-    run_scan(scan_id, factory, settings)
-    with factory() as db:
-        result = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
-        assert result.notified is False
-
-
 def test_re_find_updates_last_seen_at(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest")
+    mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)
     with factory() as db:
         first = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
@@ -212,9 +198,7 @@ def test_re_find_updates_last_seen_at(factory, scan_id, settings, mocker):
 
 def test_dropout_flips_is_available_false(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", side_effect=[[make_site()], []])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest")
+    mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)  # site present
     run_scan(scan_id, factory, settings)  # site gone (empty results)
     with factory() as db:
@@ -227,9 +211,7 @@ def test_reappearance_flips_is_available_true(factory, scan_id, settings, mocker
         "core.runner.check_availability",
         side_effect=[[make_site()], [], [make_site()]],
     )
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest")
+    mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)  # present
     run_scan(scan_id, factory, settings)  # gone
     with factory() as db:
@@ -242,12 +224,77 @@ def test_reappearance_flips_is_available_true(factory, scan_id, settings, mocker
 
 def test_new_row_stamps_last_seen_and_available(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
-    mocker.patch("core.runner.attempt_cart_add", return_value=False)
-    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
-    mocker.patch("core.runner.notify_digest")
+    mocker.patch("core.runner.notify_available")
     run_scan(scan_id, factory, settings)
     with factory() as db:
         r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
         assert r.last_seen_at is not None
         assert r.last_seen_at >= r.first_seen_at
         assert r.is_available is True
+
+
+def test_available_email_sent_before_cartadd(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    order = []
+    mocker.patch("core.runner.notify_available", side_effect=lambda *a, **k: order.append("available"))
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.attempt_cart_add_batch",
+                 side_effect=lambda *a, **k: order.append("cartadd") or [{"success": True, "error": None}])
+    mocker.patch("core.runner.notify_cart_results", side_effect=lambda *a, **k: order.append("cart_results"))
+    # enable auto_book on the scan
+    with factory() as db:
+        from db.models import Scan
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True}); db.commit()
+    run_scan(scan_id, factory, settings)
+    assert order == ["available", "cartadd", "cart_results"]
+
+
+def test_run_finalized_before_cartadd(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    # cart-add raises → run must already be finalized with sites_found=1
+    mocker.patch("core.runner.attempt_cart_add_batch", side_effect=RuntimeError("sidecar died"))
+    with factory() as db:
+        from db.models import Scan
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True}); db.commit()
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        run = db.query(ScanRun).filter(ScanRun.scan_id == scan_id).first()
+        assert run.outcome == "success"
+        assert run.sites_found == 1
+        assert run.finished_at is not None
+
+
+def test_no_cartadd_when_autobook_off(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    batch = mocker.patch("core.runner.attempt_cart_add_batch")
+    cart_results = mocker.patch("core.runner.notify_cart_results")
+    run_scan(scan_id, factory, settings)  # scan_id fixture defaults auto_book False
+    batch.assert_not_called()
+    cart_results.assert_not_called()
+
+
+def test_sidecar_unhealthy_notifies_unavailable_and_skips_cartadd(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.sidecar_healthy", return_value=False)
+    batch = mocker.patch("core.runner.attempt_cart_add_batch")
+    cart_results = mocker.patch("core.runner.notify_cart_results")
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True}); db.commit()
+    run_scan(scan_id, factory, settings)
+    batch.assert_not_called()
+    cart_results.assert_called_once()
+    assert cart_results.call_args.kwargs["sidecar_available"] is False
+
+
+def test_notified_only_set_on_available_success(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available", side_effect=RuntimeError("smtp down"))
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
+        assert r is not None and r.notified is False

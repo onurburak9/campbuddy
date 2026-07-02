@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 from db.models import Scan, ScanStatus
+from core.services import scans as scans_svc
 from core.services.scans import (
     list_scans,
     get_scan,
@@ -10,7 +11,7 @@ from core.services.scans import (
     pause_scan,
     resume_scan,
 )
-from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState
+from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed
 from tests.services.conftest import make_user
 
 
@@ -182,3 +183,25 @@ def test_resume_completed_scan_raises_invalid_state(db):
     db.flush()
     with pytest.raises(InvalidState):
         resume_scan(db, scan.id, u.id)
+
+
+def test_create_scan_autobook_without_creds_rejected(db):
+    u = make_user(db)  # no rec.gov creds
+    with pytest.raises(ValidationFailed):
+        scans_svc.create_scan(db, u.id, {"search_windows": WINDOWS, "auto_book": True})
+
+
+def test_create_scan_autobook_with_creds_ok(db):
+    u = make_user(db)
+    u.recreationgov_email = "rg@e.com"
+    u.recreationgov_password = "enc"
+    db.flush()
+    scan = scans_svc.create_scan(db, u.id, {"search_windows": WINDOWS, "auto_book": True})
+    assert scan.auto_book is True
+
+
+def test_update_scan_enable_autobook_without_creds_rejected(db):
+    u = make_user(db)
+    scan = scans_svc.create_scan(db, u.id, {"search_windows": WINDOWS})
+    with pytest.raises(ValidationFailed):
+        scans_svc.update_scan(db, scan.id, u.id, {"auto_book": True})

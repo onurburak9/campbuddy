@@ -85,6 +85,7 @@ class Scan(Base):
     notify_via_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_via_telegram: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notify_on_new_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    auto_book: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

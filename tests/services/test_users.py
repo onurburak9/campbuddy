@@ -1,7 +1,9 @@
 import pytest
 from db.models import User, Scan
 from core.services.users import get_user_by_email, update_profile, scans_used
+from core.services import scans as scans_svc
 from core.services.exceptions import NotFound
+from core.crypto import encrypt_password
 from tests.services.conftest import make_user
 
 ENCRYPTION_KEY = "1JeJa5uwBWlgLvtYCSfhs5v6MCccwuoxqTd03VOVEeQ="
@@ -64,3 +66,31 @@ def test_get_user_by_email_excludes_soft_deleted(db):
     db.flush()
     with pytest.raises(NotFound):
         get_user_by_email(db, "softdel@e.com")
+
+
+def test_clearing_recgov_email_disables_autobook(db):
+    u = make_user(db)
+    u.recreationgov_email = "rg@e.com"
+    u.recreationgov_password = "enc"
+    db.flush()
+    scan = scans_svc.create_scan(db, u.id, {"search_windows": WINDOWS, "auto_book": True})
+    assert scan.auto_book is True
+
+    update_profile(db, u.id, {"recreationgov_email": ""}, ENCRYPTION_KEY)
+
+    refreshed = db.query(Scan).filter(Scan.id == scan.id).first()
+    assert refreshed.auto_book is False
+
+
+def test_clearing_recgov_password_disables_autobook(db):
+    u = make_user(db)
+    u.recreationgov_email = "rg@e.com"
+    u.recreationgov_password = encrypt_password("s3cr3t", ENCRYPTION_KEY)
+    db.flush()
+    scan = scans_svc.create_scan(db, u.id, {"search_windows": WINDOWS, "auto_book": True})
+    assert scan.auto_book is True
+
+    update_profile(db, u.id, {"recreationgov_password": ""}, ENCRYPTION_KEY)
+
+    refreshed = db.query(Scan).filter(Scan.id == scan.id).first()
+    assert refreshed.auto_book is False

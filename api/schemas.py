@@ -67,6 +67,7 @@ class ScanCreate(BaseModel):
     notify_via_email: bool = True
     notify_via_telegram: bool = False
     notify_on_new_only: bool = True
+    auto_book: bool = False
 
     @validator("provider")
     def valid_provider(cls, v):
@@ -94,6 +95,7 @@ class ScanUpdate(BaseModel):
     notify_via_email: Optional[bool] = None
     notify_via_telegram: Optional[bool] = None
     notify_on_new_only: Optional[bool] = None
+    auto_book: Optional[bool] = None
 
     @validator("search_windows")
     def at_least_one_window(cls, v):
@@ -125,6 +127,7 @@ class ScanResponse(BaseModel):
     notify_via_email: bool
     notify_via_telegram: bool
     notify_on_new_only: bool
+    auto_book: bool
     created_at: datetime
 
     class Config:

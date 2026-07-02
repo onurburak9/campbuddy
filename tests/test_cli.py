@@ -96,6 +96,29 @@ def test_update_user_sets_scan_limit(runner, factory):
         assert user.scan_limit == 3
 
 
+def test_update_user_clear_password_disables_auto_book_on_scans(runner, factory):
+    user_id = _seed_user(factory)
+    with factory() as db:
+        db.query(User).filter(User.id == user_id).update(
+            {
+                "recreationgov_email": "rec@example.com",
+                "recreationgov_password": "encrypted-placeholder",
+            }
+        )
+        db.commit()
+    scan_id = _seed_scan(factory, user_id)
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True})
+        db.commit()
+
+    result = runner.invoke(cli, ["update-user", str(user_id), "--clear-password"])
+    assert result.exit_code == 0
+
+    with factory() as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        assert scan.auto_book is False
+
+
 # --- set-password ---
 
 def test_set_password_sets_hashed_password_for_existing_user(runner, factory):
@@ -218,3 +241,18 @@ def test_list_users_shows_password_status(runner, factory):
 
     assert "login-pw=yes" in alice_line
     assert "login-pw=NO" in bob_line
+
+
+# --- seed ---
+
+def test_seed_autobook_without_creds_skips_scan(tmp_path, runner, factory):
+    yaml_file = tmp_path / "scans.yaml"
+    yaml_file.write_text(
+        "users:\n  - email: a@e.com\n"
+        "scans:\n  - user_email: a@e.com\n    auto_book: true\n"
+        '    search_windows:\n      - start_date: "2026-07-03"\n        end_date: "2026-07-06"\n'
+    )
+    result = runner.invoke(cli, ["seed", str(yaml_file)])
+    assert result.exit_code == 0
+    with factory() as db:
+        assert db.query(Scan).count() == 0  # skipped: user has no rec.gov creds

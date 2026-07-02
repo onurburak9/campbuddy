@@ -19,9 +19,13 @@ def update_profile(db, user_id: int, data: dict, encryption_key: str) -> User:
         if key not in allowed:
             continue
         if key == "recreationgov_password":
-            user.recreationgov_password = encrypt_password(value, encryption_key)
+            user.recreationgov_password = encrypt_password(value, encryption_key) if value else None
         else:
             setattr(user, key, value)
+    if not (user.recreationgov_email and user.recreationgov_password):
+        db.query(Scan).filter(
+            Scan.user_id == user.id, Scan.deleted_at.is_(None)
+        ).update({"auto_book": False}, synchronize_session="fetch")
     db.flush()
     return user
 

@@ -63,6 +63,13 @@ def seed(yaml_path: str):
             if not user:
                 logger.error("User %s not found — skipping scan", s["user_email"])
                 continue
+            auto_book = bool(s.get("auto_book", False))
+            if auto_book and not (user.recreationgov_email and user.recreationgov_password):
+                logger.error(
+                    "Scan for %s requests auto_book but user has no Recreation.gov creds — skipping",
+                    s["user_email"],
+                )
+                continue
             scan = Scan(
                 name=s.get("name"),
                 user_id=user.id,
@@ -78,6 +85,7 @@ def seed(yaml_path: str):
                 notify_via_email=s.get("notify_via_email", True),
                 notify_via_telegram=s.get("notify_via_telegram", False),
                 notify_on_new_only=s.get("notify_on_new_only", True),
+                auto_book=auto_book,
             )
             db.add(scan)
             logger.info("Added scan for %s (%s)", s["user_email"], s.get("provider", "RecreationDotGov"))
@@ -192,7 +200,7 @@ def prune_scans():
 def test_notify(scan_id: int):
     """Send a test notification for a scan."""
     from datetime import date
-    from core.notifier import notify, NotificationPayload
+    from core.notifier import notify_available, NotificationPayload
     factory, settings = get_factory()
     with get_db(factory) as db:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
@@ -209,7 +217,7 @@ def test_notify(scan_id: int):
             cart_added=False,
             nights=3,
         )
-        notify(scan, payload, settings)
+        notify_available(scan, [payload], settings)
     click.echo("Test notification sent.")
 
 
@@ -278,6 +286,10 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
             user.hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         if scan_limit is not None:
             user.scan_limit = scan_limit
+        if not (user.recreationgov_email and user.recreationgov_password):
+            db.query(Scan).filter(
+                Scan.user_id == user.id, Scan.deleted_at.is_(None)
+            ).update({"auto_book": False}, synchronize_session="fetch")
         click.echo(f"User {user_id} updated: email={user.email} rec_email={user.recreationgov_email} "
                    f"password={'set' if user.recreationgov_password else 'none'} "
                    f"telegram={user.telegram_chat_id} "

@@ -269,6 +269,15 @@ def test_run_results_404_for_unknown_run(auth_client, scan_with_results):
     assert r.status_code == 404
 
 
+def test_create_scan_autobook_without_creds_returns_422(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={
+        "search_windows": WINDOWS,
+        "auto_book": True,
+    })
+    assert resp.status_code == 422
+
+
 def test_runs_started_after_filter(auth_client, scan_with_runs):
     client, _ = auth_client
     scan = scan_with_runs

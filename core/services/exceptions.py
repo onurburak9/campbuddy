@@ -16,3 +16,7 @@ class LimitExceeded(ServiceError):
 
 class InvalidState(ServiceError):
     pass
+
+
+class ValidationFailed(ServiceError):
+    pass

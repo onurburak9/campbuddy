@@ -68,6 +68,14 @@ def test_scan_created_with_defaults(db):
     assert scan.provider == "RecreationDotGov"
 
 
+def test_scan_auto_book_defaults_false(db):
+    user = User(email="test@example.com")
+    db.add(user)
+    db.flush()
+    scan = _make_scan(db, user)
+    assert scan.auto_book is False
+
+
 def test_scan_run_always_writable(db):
     user = User(email="test@example.com")
     db.add(user)
