@@ -7,6 +7,7 @@ import pytest
 
 from core.notifier import (
     NotificationPayload,
+    _available_body,
     notify,
     notify_available,
     notify_cart_results,
@@ -426,3 +427,97 @@ def test_notify_available_swallows_send_error(mocker):
     mocker.patch("core.notifier.send_email_available", side_effect=RuntimeError("smtp"))
     # must not raise
     notify_available(_scan(), [_payload()], MagicMock())
+
+
+def test_notify_cart_results_unavailable_sends_telegram(mocker):
+    mocker.patch("core.notifier.send_email_available")
+    send_tg = mocker.patch("core.notifier.send_telegram_available")
+    notify_cart_results(
+        _scan(email=False, telegram=True), [_payload()], MagicMock(), sidecar_available=False
+    )
+    send_tg.assert_called_once()
+
+
+def test_notify_available_sends_telegram(mocker):
+    send_tg = mocker.patch("core.notifier.send_telegram_available")
+    notify_available(_scan(telegram=True), [_payload()], MagicMock())
+    send_tg.assert_called_once()
+
+
+def test_notify_available_skips_telegram_when_disabled(mocker):
+    send_tg = mocker.patch("core.notifier.send_telegram_available")
+    notify_available(_scan(telegram=False), [_payload()], MagicMock())
+    send_tg.assert_not_called()
+
+
+def test_notify_cart_results_sends_digest_telegram(mocker):
+    mocker.patch("core.notifier.send_email_digest")
+    send_tg = mocker.patch("core.notifier.send_telegram_digest")
+    notify_cart_results(_scan(telegram=True), [_payload(cart_added=True)], MagicMock())
+    send_tg.assert_called_once()
+
+
+def test_notify_cart_results_unavailable_sends_email(mocker):
+    send_email = mocker.patch("core.notifier.send_email_available")
+    mocker.patch("core.notifier.send_telegram_available")
+    notify_cart_results(_scan(email=True), [_payload()], MagicMock(), sidecar_available=False)
+    send_email.assert_called_once()
+
+
+def test_notify_cart_results_unavailable_does_not_send_carted_digests(mocker):
+    mock_email_avail = mocker.patch("core.notifier.send_email_available")
+    mock_tg_avail = mocker.patch("core.notifier.send_telegram_available")
+    mock_email_digest = mocker.patch("core.notifier.send_email_digest")
+    mock_tg_digest = mocker.patch("core.notifier.send_telegram_digest")
+    notify_cart_results(
+        _scan(email=True, telegram=True), [_payload()], MagicMock(), sidecar_available=False
+    )
+    mock_email_avail.assert_called_once()
+    mock_tg_avail.assert_called_once()
+    mock_email_digest.assert_not_called()
+    mock_tg_digest.assert_not_called()
+
+
+def test_notify_cart_results_swallows_send_error(mocker):
+    mocker.patch("core.notifier.send_email_digest", side_effect=RuntimeError("smtp down"))
+    # must not raise
+    notify_cart_results(_scan(), [_payload(cart_added=True)], MagicMock())
+
+
+def test_notify_cart_results_unavailable_swallows_send_error(mocker):
+    mocker.patch("core.notifier.send_email_available", side_effect=RuntimeError("smtp down"))
+    mocker.patch("core.notifier.send_telegram_available", side_effect=RuntimeError("tg down"))
+    # must not raise
+    notify_cart_results(
+        _scan(email=True, telegram=True), [_payload()], MagicMock(), sidecar_available=False
+    )
+
+
+def test_available_body_contains_auto_book_followup_line():
+    body = _available_body([_payload()], auto_book=True)
+    assert "Auto-booking is in progress" in body
+
+
+def test_available_body_omits_auto_book_followup_line_when_false():
+    body = _available_body([_payload()], auto_book=False)
+    assert "Auto-booking is in progress" not in body
+
+
+def test_notify_available_noop_when_empty(mocker):
+    mock_email = mocker.patch("core.notifier.send_email_available")
+    mock_tg = mocker.patch("core.notifier.send_telegram_available")
+    notify_available(_scan(telegram=True), [], MagicMock())
+    mock_email.assert_not_called()
+    mock_tg.assert_not_called()
+
+
+def test_notify_cart_results_noop_when_empty(mocker):
+    mock_email_avail = mocker.patch("core.notifier.send_email_available")
+    mock_tg_avail = mocker.patch("core.notifier.send_telegram_available")
+    mock_email_digest = mocker.patch("core.notifier.send_email_digest")
+    mock_tg_digest = mocker.patch("core.notifier.send_telegram_digest")
+    notify_cart_results(_scan(telegram=True), [], MagicMock())
+    mock_email_avail.assert_not_called()
+    mock_tg_avail.assert_not_called()
+    mock_email_digest.assert_not_called()
+    mock_tg_digest.assert_not_called()

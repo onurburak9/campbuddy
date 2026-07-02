@@ -288,6 +288,11 @@ def notify_cart_results(scan, payloads: list[NotificationPayload], settings, sid
                 send_email_available(scan.user.email, payloads, settings, auto_book=False)
             except Exception as e:
                 logger.error("Cart-results (unavailable) email failed: %s", e)
+        if scan.notify_via_telegram and scan.user.telegram_chat_id:
+            try:
+                send_telegram_available(scan.user.telegram_chat_id, payloads, settings, auto_book=False)
+            except Exception as e:
+                logger.error("Cart-results (unavailable) Telegram failed: %s", e)
         return
     if scan.notify_via_email and scan.user.email:
         try:
