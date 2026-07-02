@@ -277,6 +277,20 @@ def test_no_cartadd_when_autobook_off(factory, scan_id, settings, mocker):
     cart_results.assert_not_called()
 
 
+def test_sidecar_unhealthy_notifies_unavailable_and_skips_cartadd(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.sidecar_healthy", return_value=False)
+    batch = mocker.patch("core.runner.attempt_cart_add_batch")
+    cart_results = mocker.patch("core.runner.notify_cart_results")
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True}); db.commit()
+    run_scan(scan_id, factory, settings)
+    batch.assert_not_called()
+    cart_results.assert_called_once()
+    assert cart_results.call_args.kwargs["sidecar_available"] is False
+
+
 def test_notified_only_set_on_available_success(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
     mocker.patch("core.runner.notify_available", side_effect=RuntimeError("smtp down"))
