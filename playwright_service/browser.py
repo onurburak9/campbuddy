@@ -2,8 +2,6 @@ import logging
 import random
 import time
 from datetime import date, datetime
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-from playwright_stealth import stealth_sync
 
 logger = logging.getLogger(__name__)
 
@@ -78,84 +76,122 @@ def _set_search_session(page, check_in: date, check_out: date) -> None:
     }}""")
 
 
-def add_to_cart(booking_url: str, email: str, password: str, check_in: str, check_out: str) -> dict:
+def _login(page, email: str, password: str) -> None:
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout  # noqa: F401
+
+    page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30_000)
+    page.wait_for_selector(EMAIL_SELECTOR, timeout=30_000)
+    _jitter(600, 1200)
+    _human_type(page, EMAIL_SELECTOR, email)
+    _jitter(400, 800)
+    _human_type(page, PASSWORD_SELECTOR, password)
+    _jitter(500, 1000)
+    page.hover(SUBMIT_SELECTOR)
+    _jitter(200, 500)
+    page.click(SUBMIT_SELECTOR)
+    page.wait_for_selector(LOGGED_IN_SELECTOR, timeout=15_000)
+    logger.info("Login successful")
+
+
+def _add_single(page, booking_url: str, check_in: str, check_out: str) -> dict:
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
     check_in_date = datetime.strptime(check_in.strip(), "%m-%d-%Y").date()
     check_out_date = datetime.strptime(check_out.strip(), "%m-%d-%Y").date()
+    _set_search_session(page, check_in_date, check_out_date)
+    _jitter(400, 800)
+    page.goto(booking_url, wait_until="domcontentloaded", timeout=30_000)
+    page.wait_for_selector("h1", timeout=30_000)
+    _jitter(1500, 2500)
+    try:
+        page.click("button:has-text('Ignore')", timeout=2_000)
+        _jitter(300, 600)
+    except PlaywrightTimeout:
+        pass
+    page.wait_for_selector(CART_SELECTOR, timeout=15_000)
+    page.hover(CART_SELECTOR)
+    _jitter(400, 800)
+    page.click(CART_SELECTOR)
+    _jitter(2000, 4000)
+    cart_label = page.get_attribute("a[aria-label*='Cart']", "aria-label") or "unknown"
+    logger.info("Post-click cart state: %s", cart_label)
+    if "in cart" in cart_label:
+        return {"success": True, "error": None}
+    return {"success": False, "error": f"Cart not updated after click — state: {cart_label}"}
+
+
+def _add_all(page, sites: list[dict]) -> list[dict]:
+    results = []
+    for s in sites:
+        try:
+            results.append(_add_single(page, s["booking_url"], s["check_in"], s["check_out"]))
+        except Exception as e:
+            logger.error("Cart add failed for %s: %s", s.get("booking_url"), e)
+            results.append({"success": False, "error": str(e)})
+    return results
+
+
+def _new_page(p):
+    browser_ = p.chromium.launch(
+        headless=True,
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+        ],
+    )
+    context = browser_.new_context(
+        user_agent=USER_AGENT,
+        viewport={"width": 1440, "height": 900},
+        locale="en-US",
+        timezone_id="America/Los_Angeles",
+        extra_http_headers={
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "sec-ch-ua": '"Chromium";v="136", "Google Chrome";v="136", "Not-A.Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+        },
+    )
+    context.add_init_script(STEALTH_JS)
+    page = context.new_page()
+    return browser_, context, page
+
+
+def add_to_cart(booking_url: str, email: str, password: str, check_in: str, check_out: str) -> dict:
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import stealth_sync
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-            ],
-        )
-        context = browser.new_context(
-            user_agent=USER_AGENT,
-            viewport={"width": 1440, "height": 900},
-            locale="en-US",
-            timezone_id="America/Los_Angeles",
-            extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                "sec-ch-ua": '"Chromium";v="136", "Google Chrome";v="136", "Not-A.Brand";v="99"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"macOS"',
-            },
-        )
-        context.add_init_script(STEALTH_JS)
-        page = context.new_page()
+        browser_, context, page = _new_page(p)
         stealth_sync(page)
         try:
-            page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30_000)
-            page.wait_for_selector(EMAIL_SELECTOR, timeout=30_000)
-
-            _jitter(600, 1200)
-            _human_type(page, EMAIL_SELECTOR, email)
-            _jitter(400, 800)
-            _human_type(page, PASSWORD_SELECTOR, password)
-            _jitter(500, 1000)
-            page.hover(SUBMIT_SELECTOR)
-            _jitter(200, 500)
-            page.click(SUBMIT_SELECTOR)
-            page.wait_for_selector(LOGGED_IN_SELECTOR, timeout=15_000)
-            logger.info("Login successful")
-
-            _set_search_session(page, check_in_date, check_out_date)
-            _jitter(400, 800)
-
-            page.goto(booking_url, wait_until="domcontentloaded", timeout=30_000)
-            page.wait_for_selector("h1", timeout=30_000)
-            _jitter(1500, 2500)
-
-            try:
-                page.click("button:has-text('Ignore')", timeout=2_000)
-                _jitter(300, 600)
-            except PlaywrightTimeout:
-                pass
-
-            page.wait_for_selector(CART_SELECTOR, timeout=15_000)
-            page.hover(CART_SELECTOR)
-            _jitter(400, 800)
-            page.click(CART_SELECTOR)
-            _jitter(2000, 4000)
-
-            cart_label = page.get_attribute("a[aria-label*='Cart']", "aria-label") or "unknown"
-            logger.info("Post-click cart state: %s", cart_label)
-
-            if "in cart" in cart_label:
-                return {"success": True}
-            return {"success": False, "error": f"Cart not updated after click — state: {cart_label}"}
-
-        except PlaywrightTimeout as e:
-            logger.error("Playwright timeout: %s", e)
-            return {"success": False, "error": f"Timeout: {e}"}
+            _login(page, email, password)
+            return _add_single(page, booking_url, check_in, check_out)
         except Exception as e:
             logger.error("Playwright error: %s", e)
             return {"success": False, "error": str(e)}
         finally:
             page.close()
             context.close()
-            browser.close()
+            browser_.close()
+
+
+def add_to_cart_batch(email: str, password: str, sites: list[dict]) -> list[dict]:
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import stealth_sync
+
+    with sync_playwright() as p:
+        browser_, context, page = _new_page(p)
+        stealth_sync(page)
+        try:
+            _login(page, email, password)
+            return _add_all(page, sites)
+        except Exception as e:
+            logger.error("Batch login/setup error: %s", e)
+            return [{"success": False, "error": str(e)} for _ in sites]
+        finally:
+            page.close()
+            context.close()
+            browser_.close()
