@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/cn";
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function IconSidebar({ onOpenScans, open = false, onClose }: {
   onOpenScans: () => void;
@@ -12,6 +14,8 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
   const { theme, toggle } = useTheme();
   const { logout, user } = useAuth();
   const { pathname } = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open || !onClose) return;
@@ -19,6 +23,37 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const focusables = navRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    focusables?.[0]?.focus();
+
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const focusables = navRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
   const closeDrawer = () => onClose?.();
   const iconBtn = "flex h-10 w-10 items-center justify-center rounded-lg text-xl transition-colors";
@@ -34,6 +69,7 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
         />
       )}
       <nav
+        ref={navRef}
         className={cn(
           "flex w-[52px] flex-col items-center justify-between border-r border-sand-200 bg-white py-3 dark:border-[#222] dark:bg-[#1A1A1A]",
           "fixed left-0 top-0 z-50 h-full transition-transform md:static md:z-auto md:h-auto md:translate-x-0",
