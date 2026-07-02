@@ -11,8 +11,8 @@ export function ScanListPanel({ selectedScanId, onSelect, onNewScan }: {
   const { data: scans, isLoading } = useScans();
 
   return (
-    <aside className="flex w-60 flex-col border-r border-sand-200 bg-white dark:border-[#222] dark:bg-[#1A1A1A]">
-      <header className="flex items-center justify-between border-b border-sand-200 px-3 py-3 dark:border-[#222]">
+    <aside className="flex w-full flex-col border-r border-sand-200 bg-white dark:border-[#222] dark:bg-[#1A1A1A] md:w-60">
+      <header className="hidden items-center justify-between border-b border-sand-200 px-3 py-3 dark:border-[#222] md:flex">
         <h2 className="text-sm font-semibold text-stone-800 dark:text-[#EEE]">Scans</h2>
         <button
           aria-label="New scan"
