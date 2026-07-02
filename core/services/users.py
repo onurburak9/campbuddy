@@ -19,7 +19,7 @@ def update_profile(db, user_id: int, data: dict, encryption_key: str) -> User:
         if key not in allowed:
             continue
         if key == "recreationgov_password":
-            user.recreationgov_password = encrypt_password(value, encryption_key)
+            user.recreationgov_password = encrypt_password(value, encryption_key) if value else None
         else:
             setattr(user, key, value)
     if not (user.recreationgov_email and user.recreationgov_password):
