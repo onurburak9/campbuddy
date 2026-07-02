@@ -63,6 +63,13 @@ def seed(yaml_path: str):
             if not user:
                 logger.error("User %s not found — skipping scan", s["user_email"])
                 continue
+            auto_book = bool(s.get("auto_book", False))
+            if auto_book and not (user.recreationgov_email and user.recreationgov_password):
+                logger.error(
+                    "Scan for %s requests auto_book but user has no Recreation.gov creds — skipping",
+                    s["user_email"],
+                )
+                continue
             scan = Scan(
                 name=s.get("name"),
                 user_id=user.id,
@@ -78,6 +85,7 @@ def seed(yaml_path: str):
                 notify_via_email=s.get("notify_via_email", True),
                 notify_via_telegram=s.get("notify_via_telegram", False),
                 notify_on_new_only=s.get("notify_on_new_only", True),
+                auto_book=auto_book,
             )
             db.add(scan)
             logger.info("Added scan for %s (%s)", s["user_email"], s.get("provider", "RecreationDotGov"))

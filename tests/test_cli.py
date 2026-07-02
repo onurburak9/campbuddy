@@ -218,3 +218,18 @@ def test_list_users_shows_password_status(runner, factory):
 
     assert "login-pw=yes" in alice_line
     assert "login-pw=NO" in bob_line
+
+
+# --- seed ---
+
+def test_seed_autobook_without_creds_skips_scan(tmp_path, runner, factory):
+    yaml_file = tmp_path / "scans.yaml"
+    yaml_file.write_text(
+        "users:\n  - email: a@e.com\n"
+        "scans:\n  - user_email: a@e.com\n    auto_book: true\n"
+        '    search_windows:\n      - start_date: "2026-07-03"\n        end_date: "2026-07-06"\n'
+    )
+    result = runner.invoke(cli, ["seed", str(yaml_file)])
+    assert result.exit_code == 0
+    with factory() as db:
+        assert db.query(Scan).count() == 0  # skipped: user has no rec.gov creds

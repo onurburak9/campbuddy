@@ -16,3 +16,4 @@ scans:
     notify_via_email: true
     notify_via_telegram: false
     notify_on_new_only: true
+    # auto_book: true   # requires recreationgov_email + recreationgov_password on the user
