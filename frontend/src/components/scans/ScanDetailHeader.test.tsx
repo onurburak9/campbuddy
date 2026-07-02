@@ -56,4 +56,11 @@ describe("ScanDetailHeader", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalled());
   });
+
+  it("stacks vertically on mobile and switches to a row at md", () => {
+    const { container } = wrap(<ScanDetailHeader scan={scan} onDeleted={vi.fn()} onEdit={vi.fn()} />);
+    const header = container.querySelector("header")!;
+    expect(header.className).toContain("flex-col");
+    expect(header.className).toContain("md:flex-row");
+  });
 });

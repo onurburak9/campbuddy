@@ -34,7 +34,7 @@ export function ScanDetailHeader({ scan, onDeleted, onEdit }: {
   }
 
   return (
-    <header className="flex items-start justify-between border-b border-sand-200 px-6 py-4 dark:border-[#222]">
+    <header className="flex flex-col gap-3 border-b border-sand-200 px-4 py-4 dark:border-[#222] md:flex-row md:items-start md:justify-between md:px-6">
       <div>
         <div className="flex items-center gap-2">
           <StatusDot tone={scanStatusTone(scan.status)} />

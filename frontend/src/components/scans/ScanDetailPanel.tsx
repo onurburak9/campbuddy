@@ -26,10 +26,10 @@ export function ScanDetailPanel({ scanId, onDeleted }: { scanId: number; onDelet
   return (
     <section className="flex flex-1 flex-col overflow-hidden">
       <ScanDetailHeader scan={scan} onDeleted={onDeleted} onEdit={() => setActiveTab("settings")} />
-      <div className="px-6">
+      <div className="px-4 md:px-6">
         <Tabs tabs={TABS} active={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
       </div>
-      <div className="flex-1 overflow-y-auto px-6 py-5" key={scan.id}>
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6" key={scan.id}>
         {activeTab === "overview" && <OverviewTab scan={scan} />}
         {activeTab === "results" && <ResultsTab scanId={scan.id} />}
         {activeTab === "runs" && <RunHistoryTab scanId={scan.id} />}
