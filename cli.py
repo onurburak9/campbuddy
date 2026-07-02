@@ -192,7 +192,7 @@ def prune_scans():
 def test_notify(scan_id: int):
     """Send a test notification for a scan."""
     from datetime import date
-    from core.notifier import notify, NotificationPayload
+    from core.notifier import notify_available, NotificationPayload
     factory, settings = get_factory()
     with get_db(factory) as db:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
@@ -209,7 +209,7 @@ def test_notify(scan_id: int):
             cart_added=False,
             nights=3,
         )
-        notify(scan, payload, settings)
+        notify_available(scan, [payload], settings)
     click.echo("Test notification sent.")
 
 

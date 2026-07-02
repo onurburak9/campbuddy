@@ -8,6 +8,8 @@ import pytest
 from core.notifier import (
     NotificationPayload,
     notify,
+    notify_available,
+    notify_cart_results,
     notify_digest,
     send_email,
     send_email_digest,
@@ -377,3 +379,50 @@ def test_notify_digest_email_failure_does_not_block_telegram(mocker):
     settings = make_settings()
     notify_digest(scan, [make_payload_at()], settings)
     mock_tg.assert_called_once_with("123", [make_payload_at()], settings)
+
+
+# ---------------------------------------------------------------------------
+# Two-phase notifier: notify_available / notify_cart_results
+# ---------------------------------------------------------------------------
+
+
+def _payload(cart_added=False):
+    return NotificationPayload(
+        facility_name="Big Meadow", site_name="07", campsite_type="STANDARD",
+        booking_date=date(2026, 7, 11), booking_end_date=date(2026, 7, 13),
+        booking_url="https://rec.gov/1", cart_added=cart_added, nights=2,
+    )
+
+
+def _scan(auto_book=False, email=True, telegram=False):
+    s = MagicMock()
+    s.auto_book = auto_book
+    s.notify_via_email = email
+    s.notify_via_telegram = telegram
+    s.user.email = "u@e.com"
+    s.user.telegram_chat_id = "123" if telegram else None
+    return s
+
+
+def test_notify_available_sends_email(mocker):
+    send = mocker.patch("core.notifier.send_email_available")
+    notify_available(_scan(), [_payload()], MagicMock())
+    send.assert_called_once()
+
+
+def test_notify_available_skips_email_when_disabled(mocker):
+    send = mocker.patch("core.notifier.send_email_available")
+    notify_available(_scan(email=False), [_payload()], MagicMock())
+    send.assert_not_called()
+
+
+def test_notify_cart_results_sends_digest_email(mocker):
+    send = mocker.patch("core.notifier.send_email_digest")
+    notify_cart_results(_scan(), [_payload(cart_added=True)], MagicMock())
+    send.assert_called_once()
+
+
+def test_notify_available_swallows_send_error(mocker):
+    mocker.patch("core.notifier.send_email_available", side_effect=RuntimeError("smtp"))
+    # must not raise
+    notify_available(_scan(), [_payload()], MagicMock())
