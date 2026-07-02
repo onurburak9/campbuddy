@@ -8,10 +8,8 @@ import pytest
 from core.notifier import (
     NotificationPayload,
     _available_body,
-    notify,
     notify_available,
     notify_cart_results,
-    notify_digest,
     send_email,
     send_email_digest,
     send_telegram,
@@ -93,46 +91,6 @@ def test_telegram_raises_on_api_error(mocker):
     mock_post.return_value.status_code = 403
     with pytest.raises(RuntimeError, match="403"):
         send_telegram("123456", make_payload(), make_settings())
-
-
-def test_notify_dispatches_both_channels(mocker):
-    mock_email = mocker.patch("core.notifier.send_email")
-    mock_tg = mocker.patch("core.notifier.send_telegram")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "user@example.com"
-    scan.user.telegram_chat_id = "123456"
-    payload = make_payload()
-    settings = make_settings()
-    notify(scan, payload, settings)
-    mock_email.assert_called_once_with("user@example.com", payload, settings)
-    mock_tg.assert_called_once_with("123456", payload, settings)
-
-
-def test_notify_skips_telegram_when_no_chat_id(mocker):
-    mock_email = mocker.patch("core.notifier.send_email")
-    mock_tg = mocker.patch("core.notifier.send_telegram")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "user@example.com"
-    scan.user.telegram_chat_id = None
-    notify(scan, make_payload(), make_settings())
-    mock_email.assert_called_once()
-    mock_tg.assert_not_called()
-
-
-def test_notify_catches_email_failure(mocker):
-    mocker.patch("core.notifier.send_email", side_effect=RuntimeError("SMTP down"))
-    mock_tg = mocker.patch("core.notifier.send_telegram")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "user@example.com"
-    scan.user.telegram_chat_id = "123456"
-    notify(scan, make_payload(), make_settings())
-    mock_tg.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -334,52 +292,6 @@ def test_digest_telegram_cross_month_dates(mocker):
     send_telegram_digest("123456", payloads, make_settings())
     text = mock_post.call_args[1]["json"]["text"]
     assert "Jul 30-Aug 1" in text
-
-
-# ---------------------------------------------------------------------------
-# notify_digest dispatcher
-# ---------------------------------------------------------------------------
-
-
-def test_notify_digest_dispatches_both_channels(mocker):
-    mock_email = mocker.patch("core.notifier.send_email_digest")
-    mock_tg = mocker.patch("core.notifier.send_telegram_digest")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "user@example.com"
-    scan.user.telegram_chat_id = "123456"
-    payloads = [make_payload_at()]
-    settings = make_settings()
-    notify_digest(scan, payloads, settings)
-    mock_email.assert_called_once_with("user@example.com", payloads, settings)
-    mock_tg.assert_called_once_with("123456", payloads, settings)
-
-
-def test_notify_digest_noop_on_empty(mocker):
-    mock_email = mocker.patch("core.notifier.send_email_digest")
-    mock_tg = mocker.patch("core.notifier.send_telegram_digest")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "u@example.com"
-    scan.user.telegram_chat_id = "123"
-    notify_digest(scan, [], make_settings())
-    mock_email.assert_not_called()
-    mock_tg.assert_not_called()
-
-
-def test_notify_digest_email_failure_does_not_block_telegram(mocker):
-    mocker.patch("core.notifier.send_email_digest", side_effect=RuntimeError("SMTP down"))
-    mock_tg = mocker.patch("core.notifier.send_telegram_digest")
-    scan = MagicMock()
-    scan.notify_via_email = True
-    scan.notify_via_telegram = True
-    scan.user.email = "u@example.com"
-    scan.user.telegram_chat_id = "123"
-    settings = make_settings()
-    notify_digest(scan, [make_payload_at()], settings)
-    mock_tg.assert_called_once_with("123", [make_payload_at()], settings)
 
 
 # ---------------------------------------------------------------------------
