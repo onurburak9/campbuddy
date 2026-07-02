@@ -52,21 +52,28 @@ Runs one background job per active scan, firing at each scan's `polling_interval
 Executes a single scan end-to-end:
 1. Calls availability checker
 2. Writes `scan_run` record (always, regardless of outcome)
-3. For each new site: saves result, calls booking sidecar, then routes by urgency —
-   cart-add succeeded → immediate per-site notification; otherwise → buffered into
-   a per-run digest sent once after the loop
+3. Dedupes new sites against existing `scan_results`, inserts rows, and updates the
+   availability lifecycle (bumps `last_seen_at`/`is_available` for sites still present,
+   flips previously-available sites that dropped out to unavailable)
+4. Finalizes the `ScanRun` (`outcome`, `sites_found`, `finished_at`) *before* any
+   cart-add, so a sidecar crash can't leave the run record orphaned
+5. If there are new sites, sends the "available" notification (`notify_available`)
+6. If the scan has `auto_book` enabled and the user has both Recreation.gov
+   credentials, checks sidecar health, then batch-adds all new sites to cart in a
+   single sidecar call (one login per run) and sends the cart-results notification
+   (`notify_cart_results`)
 
 ### Availability Checker (`core/availability.py`)
 Thin wrapper around camply's OO API. Converts a `Scan` DB record → `SearchRecreationDotGov` call → returns `list[AvailableCampsite]`. Provider class is looked up from `PROVIDER_MAP`.
 
 ### Booking Client (`core/booking.py`)
-HTTP client (httpx) that POSTs to the Playwright sidecar's `/add-to-cart` endpoint. Returns `True`/`False`. Failures are non-fatal — user is always notified with the booking URL.
+HTTP client (httpx) with three functions: `sidecar_healthy(settings)` — preflight `GET /health` check; `attempt_cart_add_batch(sites, email, password, settings)` — `POST /add-to-cart-batch` with the full list of new sites for a scan, logging in once and adding all of them in a single sidecar session, returning one result dict per site; and `attempt_cart_add` — the legacy single-site `POST /add-to-cart` call, still used by the `cli.py cart-add` debug command. Cart-add is opt-in per scan via the `auto_book` flag; failures are non-fatal — the user is always notified.
 
 ### Notifier (`core/notifier.py`)
-Two dispatch paths: `notify(scan, payload, settings)` for urgent single-site sends (cart-add success) and `notify_digest(scan, payloads, settings)` for batched multi-site summaries (everything else). Both honour per-scan `notify_via_email` and `notify_via_telegram` flags. Email uses smtplib/SMTP with UTF-8 MIMEText; Telegram uses the Bot API via `requests` with defensive truncation at 4000 chars. Booking URL always included in plain text.
+Two-phase dispatch per scan run: `notify_available(scan, payloads, settings)` is sent as soon as new sites are found, before any cart-add attempt, and `notify_cart_results(scan, payloads, settings, sidecar_available=...)` is sent after the batch cart-add completes (only for scans with `auto_book` enabled), including a distinct "sidecar unavailable" variant when the preflight health check fails. Both honour per-scan `notify_via_email` and `notify_via_telegram` flags. Email uses smtplib/SMTP with UTF-8 MIMEText; Telegram uses the Bot API via `requests` with defensive truncation at 4000 chars. Booking URL always included in plain text.
 
 ### Playwright Sidecar (`playwright_service/`)
-Isolated FastAPI service in its own Docker container. Receives `POST /add-to-cart { booking_url, email, password, check_in, check_out }` (dates in `MM-DD-YYYY`), drives headless Chromium to log in and add the site to cart, returns `{ success, error }`. Runs separately so a browser crash cannot kill the scheduler.
+Isolated FastAPI service in its own Docker container. `POST /health` reports readiness for the runner's preflight check. `POST /add-to-cart-batch { email, password, sites: [{ booking_url, check_in, check_out }, ...] }` is the primary path used by `auto_book` scans — logs in once, then adds every site to cart in the same browser session, returning `{ results: [{ success, error }, ...] }` (one per site, dates in `MM-DD-YYYY`). `POST /add-to-cart { booking_url, email, password, check_in, check_out }` remains for single-site use (e.g. the `cli.py cart-add` debug command). Runs separately so a browser crash cannot kill the scheduler.
 
 Bot-detection hardening: `playwright-stealth`, Chrome 136 user agent + matching `sec-ch-ua` headers, human-like typing delays, and jitter between actions. Dates are pre-selected by injecting `r1s_search_session` into `localStorage` before navigating to the campsite page — see [`docs/superpowers/recreation-gov-checkout-flow.md`](docs/superpowers/recreation-gov-checkout-flow.md) for the full site map.
 
@@ -95,16 +102,24 @@ Scheduler fires scan_id=N
         → availability.check_availability(scan)
             → camply.SearchRecreationDotGov(...).get_matching_campsites(continuous=False)
             → returns [AvailableCampsite, ...]
-        → write ScanRun(outcome, sites_found)
+        → write ScanRun(started_at)
         → for each site:
             → dedup check (campsite_id + booking_date already in scan_results?)
-            → write ScanResult(cart_added=False, notified=False)
-            → booking.attempt_cart_add(url, email, password, check_in, check_out)
-                → POST playwright_service /add-to-cart {booking_url, email, password, check_in, check_out}
-            → notifier.notify(scan, payload)
-                → send_email() and/or send_telegram()
-            → update ScanResult(cart_added, notified, timestamps)
-        → commit
+            → write ScanResult(cart_added=False, notified=False, is_available=True)
+        → update availability lifecycle for existing ScanResults (last_seen_at, is_available)
+        → finalize ScanRun(outcome, sites_found, finished_at)   ← before any cart-add
+        → if new sites found:
+            → notifier.notify_available(scan, payloads, settings)
+                → send_email_available() and/or send_telegram_available()
+            → mark those ScanResults notified=True
+        → if scan.auto_book and user has both rec.gov credentials:
+            → booking.sidecar_healthy(settings)
+                → not healthy → notifier.notify_cart_results(scan, payloads, settings, sidecar_available=False); stop
+            → booking.attempt_cart_add_batch(sites, email, password, settings)
+                → POST playwright_service /add-to-cart-batch {email, password, sites: [...]}  (one login, all sites)
+            → update each ScanResult(cart_added, cart_added_at)
+            → notifier.notify_cart_results(scan, payloads, settings)
+                → send_email_available() and/or send_telegram_available() (cart-add outcome variant)
 ```
 
 ## Database Schema

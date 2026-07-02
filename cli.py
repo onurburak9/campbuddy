@@ -286,6 +286,10 @@ def update_user(user_id, email, recreationgov_email, recreationgov_password, cle
             user.hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         if scan_limit is not None:
             user.scan_limit = scan_limit
+        if not (user.recreationgov_email and user.recreationgov_password):
+            db.query(Scan).filter(
+                Scan.user_id == user.id, Scan.deleted_at.is_(None)
+            ).update({"auto_book": False}, synchronize_session="fetch")
         click.echo(f"User {user_id} updated: email={user.email} rec_email={user.recreationgov_email} "
                    f"password={'set' if user.recreationgov_password else 'none'} "
                    f"telegram={user.telegram_chat_id} "

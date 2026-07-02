@@ -96,6 +96,29 @@ def test_update_user_sets_scan_limit(runner, factory):
         assert user.scan_limit == 3
 
 
+def test_update_user_clear_password_disables_auto_book_on_scans(runner, factory):
+    user_id = _seed_user(factory)
+    with factory() as db:
+        db.query(User).filter(User.id == user_id).update(
+            {
+                "recreationgov_email": "rec@example.com",
+                "recreationgov_password": "encrypted-placeholder",
+            }
+        )
+        db.commit()
+    scan_id = _seed_scan(factory, user_id)
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True})
+        db.commit()
+
+    result = runner.invoke(cli, ["update-user", str(user_id), "--clear-password"])
+    assert result.exit_code == 0
+
+    with factory() as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        assert scan.auto_book is False
+
+
 # --- set-password ---
 
 def test_set_password_sets_hashed_password_for_existing_user(runner, factory):
