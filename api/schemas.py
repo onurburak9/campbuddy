@@ -2,6 +2,9 @@ from typing import Optional, List
 from datetime import date, datetime
 from pydantic import BaseModel, Field, validator
 from db.models import ScanStatus, ScanOutcome
+import re
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 VALID_PROVIDERS = {
     "RecreationDotGov",
@@ -29,6 +32,17 @@ VALID_PROVIDERS = {
 class LoginRequest(BaseModel):
     email: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=8)
+
+    @validator("email")
+    def valid_email_format(cls, v):
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Invalid email format")
+        return v
 
 
 class MeResponse(BaseModel):
