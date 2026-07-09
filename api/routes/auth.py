@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
-from api.auth import verify_password, create_token, hash_password, COOKIE_NAME
+from api.auth import verify_password, hash_password, COOKIE_NAME, issue_session_cookie
 from api.deps import get_db_dep, get_current_user
 from api.schemas import LoginRequest, MeResponse
 from config.settings import get_settings
@@ -28,15 +28,7 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_d
         logger.warning("Failed login attempt for email=%s", body.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     settings = get_settings()
-    token = create_token(user.id, settings.api_secret_key)
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
-        max_age=86400,
-    )
+    issue_session_cookie(response, user.id, settings)
     return {"ok": True}
 
 
