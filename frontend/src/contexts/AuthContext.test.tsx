@@ -50,14 +50,18 @@ describe("AuthContext", () => {
   });
 
   it("registers and authenticates", async () => {
+    let registered = false;
     server.use(
       http.get("/api/v1/auth/me", () =>
-        HttpResponse.json({ id: 2, email: "new@e.com", scan_limit: 5, scans_used: 0 })
+        registered
+          ? HttpResponse.json({ id: 2, email: "new@e.com", scan_limit: 5, scans_used: 0 })
+          : new HttpResponse(null, { status: 401 })
       ),
-      http.post("/api/v1/auth/register", () => HttpResponse.json(undefined))
+      http.post("/api/v1/auth/register", () => { registered = true; return HttpResponse.json(undefined); })
     );
     function RegisterProbe() {
-      const { isAuthenticated, register } = useAuth();
+      const { isAuthenticated, isLoading, register } = useAuth();
+      if (isLoading) return <span>loading</span>;
       return (
         <div>
           <span>{isAuthenticated ? "in" : "out"}</span>
