@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/campbuddy.db"
     api_secret_key: str = ""
     cookie_secure: bool = False
+    registration_enabled: bool = True
 
     class Config:
         env_file = ".env"

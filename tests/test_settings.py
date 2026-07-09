@@ -67,3 +67,14 @@ def test_api_secret_key_loaded_from_env(monkeypatch):
     monkeypatch.setenv("API_SECRET_KEY", "my-secret")
     s = Settings(_env_file=None)
     assert s.api_secret_key == "my-secret"
+
+
+def test_registration_enabled_defaults_true(env):
+    s = Settings(_env_file=None)
+    assert s.registration_enabled is True
+
+
+def test_registration_enabled_can_be_disabled(env):
+    env.setenv("REGISTRATION_ENABLED", "false")
+    s = Settings(_env_file=None)
+    assert s.registration_enabled is False
