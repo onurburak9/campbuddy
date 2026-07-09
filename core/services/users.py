@@ -1,5 +1,5 @@
 from db.models import User, Scan
-from core.services.exceptions import NotFound
+from core.services.exceptions import NotFound, InvalidState
 from core.crypto import encrypt_password
 
 
@@ -36,3 +36,13 @@ def scans_used(db, user_id: int) -> int:
         .filter(Scan.user_id == user_id, Scan.deleted_at.is_(None))
         .count()
     )
+
+
+def register_user(db, email: str, hashed_password: str) -> User:
+    existing = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+    if existing:
+        raise InvalidState("Email already in use")
+    user = User(email=email, hashed_password=hashed_password)
+    db.add(user)
+    db.flush()
+    return user
