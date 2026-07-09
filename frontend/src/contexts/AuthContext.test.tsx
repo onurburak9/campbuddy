@@ -48,4 +48,31 @@ describe("AuthContext", () => {
     await userEvent.click(screen.getByText("login"));
     await waitFor(() => expect(screen.getByText("hi a@b.c")).toBeInTheDocument());
   });
+
+  it("registers and authenticates", async () => {
+    server.use(
+      http.get("/api/v1/auth/me", () =>
+        HttpResponse.json({ id: 2, email: "new@e.com", scan_limit: 5, scans_used: 0 })
+      ),
+      http.post("/api/v1/auth/register", () => HttpResponse.json(undefined))
+    );
+    function RegisterProbe() {
+      const { isAuthenticated, register } = useAuth();
+      return (
+        <div>
+          <span>{isAuthenticated ? "in" : "out"}</span>
+          <button onClick={() => register("new@e.com", "longenough")}>register</button>
+        </div>
+      );
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AuthProvider><RegisterProbe /></AuthProvider>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(screen.getByText("out")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("register"));
+    await waitFor(() => expect(screen.getByText("in")).toBeInTheDocument());
+  });
 });
