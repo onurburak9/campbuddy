@@ -21,10 +21,14 @@ def mock_provider(mocker):
 
 def test_search_recreation_areas_normalizes_results(mock_provider):
     mock_provider.find_recreation_areas.return_value = [
-        {"RecAreaID": 2991, "RecAreaName": "Yosemite National Park", "RECAREAADDRESS": [{"AddressStateCode": "CA"}]},
+        {
+            "RecAreaID": 2991, "RecAreaName": "Yosemite National Park",
+            "RECAREAADDRESS": [{"AddressStateCode": "CA"}],
+            "ORGANIZATION": [{"OrgName": "National Park Service"}],
+        },
     ]
     results = search.search_recreation_areas("Yosemite")
-    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA"}]
+    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}]
     mock_provider.find_recreation_areas.assert_called_once_with(search_string="Yosemite")
 
 
@@ -42,7 +46,15 @@ def test_search_recreation_areas_handles_missing_address(mock_provider):
         {"RecAreaID": 5, "RecAreaName": "No Address Area", "RECAREAADDRESS": []},
     ]
     results = search.search_recreation_areas("No Address")
-    assert results == [{"id": 5, "name": "No Address Area", "state": None}]
+    assert results == [{"id": 5, "name": "No Address Area", "state": None, "type": None}]
+
+
+def test_search_recreation_areas_handles_missing_organization(mock_provider):
+    mock_provider.find_recreation_areas.return_value = [
+        {"RecAreaID": 481, "RecAreaName": "Hensley Lake", "RECAREAADDRESS": [{"AddressStateCode": "CA"}], "ORGANIZATION": []},
+    ]
+    results = search.search_recreation_areas("Hensley")
+    assert results == [{"id": 481, "name": "Hensley Lake", "state": "CA", "type": None}]
 
 
 def test_search_recreation_areas_caches_by_query(mock_provider):
@@ -62,10 +74,12 @@ def test_search_recreation_areas_wraps_upstream_failure(mock_provider):
 
 def test_resolve_recreation_areas_normalizes_results(mock_provider):
     mock_provider.get_ridb_data.return_value = {
-        "RecAreaID": 2991, "RecAreaName": "Yosemite National Park", "RECAREAADDRESS": [{"AddressStateCode": "CA"}],
+        "RecAreaID": 2991, "RecAreaName": "Yosemite National Park",
+        "RECAREAADDRESS": [{"AddressStateCode": "CA"}],
+        "ORGANIZATION": [{"OrgName": "National Park Service"}],
     }
     results = search.resolve_recreation_areas([2991])
-    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA"}]
+    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}]
     mock_provider.get_ridb_data.assert_called_once_with(path="recareas/2991", params={"full": True})
 
 
@@ -75,7 +89,7 @@ def test_resolve_recreation_areas_skips_failed_ids(mock_provider):
         ConnectionError("not found"),
     ]
     results = search.resolve_recreation_areas([1, 999])
-    assert results == [{"id": 1, "name": "Area One", "state": "CA"}]
+    assert results == [{"id": 1, "name": "Area One", "state": "CA", "type": None}]
 
 
 def make_facility(**overrides):

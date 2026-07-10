@@ -14,10 +14,10 @@ def test_recreation_areas_requires_min_query_length(auth_client):
 
 def test_recreation_areas_happy_path(auth_client):
     client, _ = auth_client
-    with patch("api.routes.search.search_svc.search_recreation_areas", return_value=[{"id": 2991, "name": "Yosemite", "state": "CA"}]):
+    with patch("api.routes.search.search_svc.search_recreation_areas", return_value=[{"id": 2991, "name": "Yosemite", "state": "CA", "type": "National Park Service"}]):
         resp = client.get("/api/v1/search/recreation-areas", params={"q": "Yosemite"})
     assert resp.status_code == 200
-    assert resp.json() == [{"id": 2991, "name": "Yosemite", "state": "CA"}]
+    assert resp.json() == [{"id": 2991, "name": "Yosemite", "state": "CA", "type": "National Park Service"}]
 
 
 def test_recreation_areas_upstream_failure_returns_502(auth_client):
@@ -30,10 +30,10 @@ def test_recreation_areas_upstream_failure_returns_502(auth_client):
 
 def test_recreation_areas_resolve_happy_path(auth_client):
     client, _ = auth_client
-    with patch("api.routes.search.search_svc.resolve_recreation_areas", return_value=[{"id": 2991, "name": "Yosemite", "state": "CA"}]):
+    with patch("api.routes.search.search_svc.resolve_recreation_areas", return_value=[{"id": 2991, "name": "Yosemite", "state": "CA", "type": "National Park Service"}]):
         resp = client.get("/api/v1/search/recreation-areas/resolve", params={"ids": [2991]})
     assert resp.status_code == 200
-    assert resp.json() == [{"id": 2991, "name": "Yosemite", "state": "CA"}]
+    assert resp.json() == [{"id": 2991, "name": "Yosemite", "state": "CA", "type": "National Park Service"}]
 
 
 def test_campgrounds_requires_query_or_rec_area_ids(auth_client):

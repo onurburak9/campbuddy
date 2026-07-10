@@ -200,6 +200,7 @@ class RecreationAreaResult(BaseModel):
     id: int
     name: str
     state: Optional[str] = None
+    type: Optional[str] = None
 
 
 class CampgroundResult(BaseModel):

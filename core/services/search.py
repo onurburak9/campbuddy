@@ -15,9 +15,14 @@ def _get_provider() -> RecreationDotGov:
     return RecreationDotGov(api_key=settings.ridb_api_key or None)
 
 
-def _normalize_recreation_area(response: RecreationAreaResponse) -> dict:
+def _normalize_recreation_area(response: RecreationAreaResponse, raw: dict) -> dict:
     state = response.RECAREAADDRESS[0].AddressStateCode if response.RECAREAADDRESS else None
-    return {"id": response.RecAreaID, "name": response.RecAreaName, "state": state}
+    # Managing agency (e.g. "National Park Service", "US Army Corps of Engineers") is the
+    # closest RIDB gets to a "type" for a rec area — it isn't modeled by camply's
+    # RecreationAreaResponse, so it's read straight off the raw RIDB payload.
+    orgs = raw.get("ORGANIZATION") or []
+    org_type = orgs[0].get("OrgName") if orgs else None
+    return {"id": response.RecAreaID, "name": response.RecAreaName, "state": state, "type": org_type}
 
 
 @lru_cache(maxsize=128)
@@ -30,7 +35,7 @@ def search_recreation_areas(query: str) -> list:
     results = []
     for item in raw:
         try:
-            results.append(_normalize_recreation_area(RecreationAreaResponse(**item)))
+            results.append(_normalize_recreation_area(RecreationAreaResponse(**item), item))
         except Exception:
             continue
     return results
@@ -45,7 +50,7 @@ def resolve_recreation_areas(ids: list) -> list:
                 path=f"{RIDBConfig.REC_AREA_API_PATH}/{rec_area_id}",
                 params={"full": True},
             )
-            results.append(_normalize_recreation_area(RecreationAreaResponse(**data)))
+            results.append(_normalize_recreation_area(RecreationAreaResponse(**data), data))
         except Exception:
             continue
     return results
