@@ -7,6 +7,7 @@ from core.services.exceptions import UpstreamError
 @pytest.fixture(autouse=True)
 def clear_caches():
     search.search_recreation_areas.cache_clear()
+    search._search_campgrounds_cached.cache_clear()
     yield
 
 
@@ -74,3 +75,61 @@ def test_resolve_recreation_areas_skips_failed_ids(mock_provider):
     ]
     results = search.resolve_recreation_areas([1, 999])
     assert results == [{"id": 1, "name": "Area One", "state": "CA"}]
+
+
+def make_facility(**overrides):
+    facility = MagicMock()
+    facility.facility_id = overrides.get("facility_id", 232447)
+    facility.facility_name = overrides.get("facility_name", "Upper Pines")
+    facility.recreation_area = overrides.get("recreation_area", "Yosemite National Park")
+    facility.recreation_area_id = overrides.get("recreation_area_id", 2991)
+    return facility
+
+
+def test_search_campgrounds_by_query(mock_provider):
+    mock_provider.find_campgrounds.return_value = [make_facility()]
+    results = search.search_campgrounds("Upper Pines", None)
+    assert results == [{
+        "id": 232447, "name": "Upper Pines",
+        "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
+    }]
+    mock_provider.find_campgrounds.assert_called_once_with(search_string="Upper Pines")
+
+
+def test_search_campgrounds_by_rec_area_ignores_query(mock_provider):
+    mock_provider.find_campgrounds.return_value = [make_facility()]
+    search.search_campgrounds("ignored text", [2991])
+    mock_provider.find_campgrounds.assert_called_once_with(rec_area_id=[2991])
+
+
+def test_search_campgrounds_caches_by_query_and_rec_area_ids(mock_provider):
+    mock_provider.find_campgrounds.return_value = [make_facility()]
+    search.search_campgrounds(None, [2991, 2992])
+    search.search_campgrounds(None, [2992, 2991])  # same set, different order
+    assert mock_provider.find_campgrounds.call_count == 1
+
+
+def test_search_campgrounds_wraps_upstream_failure(mock_provider):
+    mock_provider.find_campgrounds.side_effect = ConnectionError("RIDB is down")
+    with pytest.raises(UpstreamError):
+        search.search_campgrounds("fail-query", None)
+
+
+def test_resolve_campgrounds_normalizes_results(mock_provider):
+    mock_provider.find_campgrounds.return_value = [make_facility()]
+    results = search.resolve_campgrounds([232447])
+    assert results == [{
+        "id": 232447, "name": "Upper Pines",
+        "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
+    }]
+    mock_provider.find_campgrounds.assert_called_once_with(campground_id=[232447])
+
+
+def test_resolve_campgrounds_skips_failed_ids(mock_provider):
+    mock_provider.find_campgrounds.side_effect = [
+        [make_facility(facility_id=1, facility_name="Found")],
+        ConnectionError("not found"),
+    ]
+    results = search.resolve_campgrounds([1, 999])
+    assert len(results) == 1
+    assert results[0]["id"] == 1
