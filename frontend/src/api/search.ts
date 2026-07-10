@@ -4,6 +4,7 @@ export interface RecreationAreaResult {
   id: number;
   name: string;
   state: string | null;
+  type: string | null;
 }
 
 export interface CampgroundResult {

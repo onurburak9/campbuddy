@@ -23,7 +23,9 @@ function RecreationAreaResultRow({ item }: { item: SelectedItem }) {
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate font-medium text-stone-900 dark:text-[#EEE]">{full.name}</p>
-        <p className="text-xs text-stone-500 dark:text-[#888]">ID {full.id}</p>
+        <p className="truncate text-xs text-stone-500 dark:text-[#888]">
+          ID {full.id}{full.type && ` · ${full.type}`}
+        </p>
       </div>
       {full.state && <Badge tone="neutral">{full.state}</Badge>}
     </div>
