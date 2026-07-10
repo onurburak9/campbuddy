@@ -8,6 +8,7 @@ from core.services.exceptions import UpstreamError
 def clear_caches():
     search.search_recreation_areas.cache_clear()
     search._search_campgrounds_cached.cache_clear()
+    search._list_campsites_cached.cache_clear()
     yield
 
 
@@ -131,5 +132,58 @@ def test_resolve_campgrounds_skips_failed_ids(mock_provider):
         ConnectionError("not found"),
     ]
     results = search.resolve_campgrounds([1, 999])
+    assert len(results) == 1
+    assert results[0]["id"] == 1
+
+
+def make_campsite(**overrides):
+    site = MagicMock()
+    site.campsite_id = overrides.get("campsite_id", 12345)
+    site.name = overrides.get("name", "Site A1")
+    site.loop = overrides.get("loop", "Loop A")
+    return site
+
+
+def test_list_campsites_normalizes_results(mock_provider):
+    mock_provider.paginate_recdotgov_campsites.return_value = [make_campsite()]
+    results = search.list_campsites([232447])
+    assert results == [{"id": 12345, "name": "Site A1", "loop": "Loop A", "campground_id": 232447}]
+    mock_provider.paginate_recdotgov_campsites.assert_called_once_with(facility_id=232447)
+
+
+def test_list_campsites_flattens_multiple_campgrounds(mock_provider):
+    mock_provider.paginate_recdotgov_campsites.side_effect = [
+        [make_campsite(campsite_id=1)],
+        [make_campsite(campsite_id=2)],
+    ]
+    results = search.list_campsites([111, 222])
+    assert [r["id"] for r in results] == [1, 2]
+
+
+def test_list_campsites_caches_by_campground_ids(mock_provider):
+    mock_provider.paginate_recdotgov_campsites.return_value = [make_campsite()]
+    search.list_campsites([232447])
+    search.list_campsites([232447])
+    assert mock_provider.paginate_recdotgov_campsites.call_count == 1
+
+
+def test_list_campsites_wraps_upstream_failure(mock_provider):
+    mock_provider.paginate_recdotgov_campsites.side_effect = ConnectionError("RIDB is down")
+    with pytest.raises(UpstreamError):
+        search.list_campsites([999])
+
+
+def test_resolve_campsites_normalizes_results(mock_provider):
+    response = MagicMock(CampsiteID=12345, CampsiteName="Site A1", Loop="Loop A", FacilityID=232447)
+    mock_provider.get_campsite_by_id.return_value = response
+    results = search.resolve_campsites([12345])
+    assert results == [{"id": 12345, "name": "Site A1", "loop": "Loop A", "campground_id": 232447}]
+    mock_provider.get_campsite_by_id.assert_called_once_with(campsite_id=12345)
+
+
+def test_resolve_campsites_skips_failed_ids(mock_provider):
+    found = MagicMock(CampsiteID=1, CampsiteName="Found", Loop="Loop A", FacilityID=111)
+    mock_provider.get_campsite_by_id.side_effect = [found, Exception("not found")]
+    results = search.resolve_campsites([1, 999])
     assert len(results) == 1
     assert results[0]["id"] == 1

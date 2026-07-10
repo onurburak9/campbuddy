@@ -89,3 +89,42 @@ def resolve_campgrounds(ids: list) -> list:
         if facilities:
             results.append(_normalize_campground(facilities[0]))
     return results
+
+
+def list_campsites(campground_ids: list) -> list:
+    return _list_campsites_cached(tuple(sorted(campground_ids)))
+
+
+@lru_cache(maxsize=128)
+def _list_campsites_cached(campground_ids):
+    provider = _get_provider()
+    results = []
+    try:
+        for facility_id in campground_ids:
+            for site in provider.paginate_recdotgov_campsites(facility_id=facility_id):
+                results.append({
+                    "id": site.campsite_id,
+                    "name": site.name,
+                    "loop": site.loop,
+                    "campground_id": facility_id,
+                })
+    except Exception as e:
+        raise UpstreamError(str(e)) from e
+    return results
+
+
+def resolve_campsites(ids: list) -> list:
+    provider = _get_provider()
+    results = []
+    for campsite_id in ids:
+        try:
+            response = provider.get_campsite_by_id(campsite_id=campsite_id)
+        except Exception:
+            continue
+        results.append({
+            "id": response.CampsiteID,
+            "name": response.CampsiteName,
+            "loop": response.Loop,
+            "campground_id": response.FacilityID,
+        })
+    return results
