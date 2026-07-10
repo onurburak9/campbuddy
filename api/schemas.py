@@ -40,7 +40,7 @@ class RegisterRequest(BaseModel):
 
     @validator("email")
     def valid_email_format(cls, v):
-        if not _EMAIL_RE.match(v):
+        if not _EMAIL_RE.fullmatch(v):
             raise ValueError("Invalid email format")
         return v
 

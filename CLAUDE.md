@@ -83,6 +83,7 @@ main.py         — scheduler entry point
 | `DATABASE_URL` | no | SQLite path (default: sqlite:///./data/campbuddy.db) |
 | `API_SECRET_KEY` | yes (api) | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `COOKIE_SECURE` | no | Set `true` when serving the API over HTTPS (default: false) |
+| `REGISTRATION_ENABLED` | no | Set `false` to disable open signup via `POST /api/v1/auth/register` (default: true) |
 
 ## Agent rules
 

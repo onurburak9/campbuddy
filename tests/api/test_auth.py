@@ -168,6 +168,11 @@ def test_register_malformed_email_returns_422(client):
     assert resp.status_code == 422
 
 
+def test_register_email_with_trailing_newline_returns_422(client):
+    resp = client.post("/api/v1/auth/register", json={"email": "a@b.c\n", "password": "longenough"})
+    assert resp.status_code == 422
+
+
 def test_register_disabled_returns_403(client, monkeypatch):
     from config.settings import get_settings
     get_settings.cache_clear()
