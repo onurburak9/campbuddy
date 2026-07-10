@@ -20,3 +20,7 @@ class InvalidState(ServiceError):
 
 class ValidationFailed(ServiceError):
     pass
+
+
+class UpstreamError(ServiceError):
+    pass

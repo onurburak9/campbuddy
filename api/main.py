@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from api import database as api_db
 from api.routes import auth, scans, users
 from config.settings import get_settings
-from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed
+from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed, UpstreamError
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,11 @@ async def invalid_state_handler(request, exc):
 @app.exception_handler(ValidationFailed)
 async def validation_failed_handler(request, exc):
     return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
+@app.exception_handler(UpstreamError)
+async def upstream_error_handler(request, exc):
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
