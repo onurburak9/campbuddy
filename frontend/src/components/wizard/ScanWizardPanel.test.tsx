@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,6 +14,16 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("ScanWizardPanel", () => {
+  beforeEach(() => {
+    // Adding an id via the fallback "Add by ID" input triggers a resolve-on-mount
+    // request for its real name; stub it so tests don't hit an unhandled request.
+    server.use(
+      http.get("/api/v1/search/recreation-areas/resolve", () =>
+        HttpResponse.json([{ id: 2991, name: "Yosemite" }])
+      )
+    );
+  });
+
   it("walks through the steps and creates a scan", async () => {
     server.use(http.post("/api/v1/scans", async ({ request }) => {
       const body: any = await request.json();
@@ -23,8 +33,9 @@ describe("ScanWizardPanel", () => {
     const onCreated = vi.fn();
     wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={onCreated} />);
 
-    // Step 1
-    await userEvent.type(screen.getByLabelText(/recreation area ids/i), "2991");
+    // Step 1 — add a Recreation Area by ID via the SearchSelect's fallback input
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
     // Step 2 — add a window
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
@@ -41,7 +52,8 @@ describe("ScanWizardPanel", () => {
   it("shows a compact mobile step indicator that advances", async () => {
     wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
     expect(screen.getByText(/step 1 of 3 · provider & sites/i)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/recreation area ids/i), "2991");
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
   });

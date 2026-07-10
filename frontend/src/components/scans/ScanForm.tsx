@@ -1,9 +1,13 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { SearchSelect } from "../ui/SearchSelect";
 import { Toggle } from "../ui/Toggle";
 import { Button } from "../ui/Button";
 import { PROVIDERS } from "../../types";
-import type { ScanFormState } from "./useScanFormState";
+import { search } from "../../api/search";
+import type { ScanFormState, SelectedItem } from "./useScanFormState";
 import type { SearchWindow } from "../../types";
 import { formatInterval } from "../../lib/format";
 
@@ -25,20 +29,69 @@ const POLLING_OPTIONS = [
 ];
 
 export function ProviderSitesFields({ state, set }: { state: ScanFormState; set: Setter }) {
+  const resolvedRecAreaIds = useResolveFallbackLabels(state.recAreaIds, search.resolveRecreationAreas, (items) => set("recAreaIds", items));
+  const resolvedCampgroundIds = useResolveFallbackLabels(state.campgroundIds, search.resolveCampgrounds, (items) => set("campgroundIds", items));
+  const resolvedCampsiteIds = useResolveFallbackLabels(state.campsiteIds, search.resolveCampsites, (items) => set("campsiteIds", items));
+
+  const recAreaIds = resolvedRecAreaIds.map((i) => i.id);
+  const campgroundIds = resolvedCampgroundIds.map((i) => i.id);
+
   return (
     <div className="space-y-4">
       <Input label="Scan name (optional)" value={state.name}
         onChange={(e) => set("name", e.target.value)} placeholder="Yosemite summer trip" />
       <Select label="Provider" value={state.provider} onChange={(v) => set("provider", v)}
         options={PROVIDERS.map((p) => ({ value: p, label: p }))} />
-      <Input label="Recreation Area IDs (comma-separated)" value={state.recAreaIds}
-        onChange={(e) => set("recAreaIds", e.target.value)} placeholder="2991, 2992" />
-      <Input label="Campground IDs (optional)" value={state.campgroundIds}
-        onChange={(e) => set("campgroundIds", e.target.value)} />
-      <Input label="Campsite IDs (optional)" value={state.campsiteIds}
-        onChange={(e) => set("campsiteIds", e.target.value)} />
+      <SearchSelect
+        label="Recreation Areas"
+        selected={resolvedRecAreaIds}
+        onChange={(items) => set("recAreaIds", items)}
+        search={(q) => search.recreationAreas(q)}
+        placeholder="Search by name, e.g. Yosemite"
+      />
+      <SearchSelect
+        label="Campgrounds (optional)"
+        selected={resolvedCampgroundIds}
+        onChange={(items) => set("campgroundIds", items)}
+        search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
+        placeholder="Search by name"
+      />
+      <SearchSelect
+        label="Campsites (optional)"
+        selected={resolvedCampsiteIds}
+        onChange={(items) => set("campsiteIds", items)}
+        search={() => (campgroundIds.length ? search.campsites(campgroundIds) : Promise.resolve([]))}
+        disabled={campgroundIds.length === 0}
+        placeholder={campgroundIds.length ? "Search by site name" : "Select a campground first"}
+      />
     </div>
   );
+}
+
+function useResolveFallbackLabels(
+  items: SelectedItem[],
+  resolve: (ids: number[]) => Promise<SelectedItem[]>,
+  apply: (items: SelectedItem[]) => void,
+): SelectedItem[] {
+  const fallbackIds = items.filter((i) => i.name === `ID ${i.id}`).map((i) => i.id);
+  const { data } = useQuery({
+    queryKey: ["resolve-ids", resolve.name, fallbackIds],
+    queryFn: () => resolve(fallbackIds),
+    enabled: fallbackIds.length > 0,
+    staleTime: Infinity,
+  });
+
+  const resolved = data && data.length > 0
+    ? items.map((i) => data.find((d) => d.id === i.id) ?? i)
+    : items;
+
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+    if (resolved.some((u, idx) => u !== items[idx])) apply(resolved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  return resolved;
 }
 
 export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: Setter }) {
