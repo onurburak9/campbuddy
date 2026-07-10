@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from api import database as api_db
-from api.routes import auth, scans, users
+from api.routes import auth, scans, users, search
 from config.settings import get_settings
 from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed, UpstreamError
 
@@ -23,6 +23,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(scans.router, prefix="/api/v1/scans", tags=["scans"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
+app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
 
 
 @app.exception_handler(NotFound)
