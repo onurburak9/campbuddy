@@ -58,4 +58,19 @@ describe("SearchSelect", () => {
     await userEvent.click(screen.getByRole("button", { name: /^add$/i }));
     expect(onChange).toHaveBeenCalledWith([{ id: 1074, name: "ID 1074" }]);
   });
+
+  it("uses renderResult to customize how each result row is displayed", async () => {
+    const search = vi.fn().mockResolvedValue([{ id: 2991, name: "Yosemite National Park", state: "CA" }]);
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[]}
+        onChange={vi.fn()}
+        search={search}
+        renderResult={(item: any) => <span>{item.name} — {item.state}</span>}
+      />
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: /recreation areas/i }), "yo");
+    await waitFor(() => expect(screen.getByText("Yosemite National Park — CA")).toBeInTheDocument());
+  });
 });

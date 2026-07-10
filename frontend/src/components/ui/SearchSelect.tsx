@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Input } from "./Input";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
@@ -13,6 +13,7 @@ interface SearchSelectProps<T extends Item> {
   selected: T[];
   onChange: (items: T[]) => void;
   search: (query: string) => Promise<T[]>;
+  renderResult?: (item: T) => ReactNode;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -22,6 +23,7 @@ export function SearchSelect<T extends Item>({
   selected,
   onChange,
   search,
+  renderResult,
   disabled,
   placeholder,
 }: SearchSelectProps<T>) {
@@ -102,15 +104,15 @@ export function SearchSelect<T extends Item>({
         <p className="text-sm text-stone-500 dark:text-[#888]">No matches — try a different search or add by ID.</p>
       )}
       {results.length > 0 && (
-        <ul className="max-h-48 overflow-y-auto rounded-md border border-sand-200 dark:border-[#222]">
+        <ul className="max-h-72 overflow-y-auto rounded-md border border-sand-200 dark:border-[#222]">
           {results.map((item) => (
             <li key={item.id}>
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-sand-100 dark:hover:bg-[#222]"
+                className="block w-full px-3 py-2.5 text-left text-sm hover:bg-sand-100 dark:hover:bg-[#222]"
                 onClick={() => select(item)}
               >
-                {item.name}
+                {renderResult ? renderResult(item) : item.name}
               </button>
             </li>
           ))}

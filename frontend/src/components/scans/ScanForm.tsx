@@ -3,13 +3,45 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { SearchSelect } from "../ui/SearchSelect";
+import { Badge } from "../ui/Badge";
 import { Toggle } from "../ui/Toggle";
 import { Button } from "../ui/Button";
 import { PROVIDERS } from "../../types";
 import { search } from "../../api/search";
+import type { RecreationAreaResult, CampgroundResult } from "../../api/search";
 import type { ScanFormState, SelectedItem } from "./useScanFormState";
 import type { SearchWindow } from "../../types";
 import { formatInterval } from "../../lib/format";
+
+// SearchSelect's generic is inferred as SelectedItem (id/name only) from the
+// selected/onChange contract, but at runtime the results here always come
+// straight from search.recreationAreas()/campgrounds(), so the fuller shape
+// is safe to assume for display purposes.
+function RecreationAreaResultRow({ item }: { item: SelectedItem }) {
+  const full = item as unknown as RecreationAreaResult;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-stone-900 dark:text-[#EEE]">{full.name}</p>
+        <p className="text-xs text-stone-500 dark:text-[#888]">ID {full.id}</p>
+      </div>
+      {full.state && <Badge tone="neutral">{full.state}</Badge>}
+    </div>
+  );
+}
+
+function CampgroundResultRow({ item }: { item: SelectedItem }) {
+  const full = item as unknown as CampgroundResult;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-stone-900 dark:text-[#EEE]">{full.name}</p>
+        <p className="truncate text-xs text-stone-500 dark:text-[#888]">{full.recreation_area}</p>
+      </div>
+      <Badge tone="neutral">ID {full.id}</Badge>
+    </div>
+  );
+}
 
 type Setter = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) => void;
 
@@ -47,6 +79,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
         selected={resolvedRecAreaIds}
         onChange={(items) => set("recAreaIds", items)}
         search={(q) => search.recreationAreas(q)}
+        renderResult={(item) => <RecreationAreaResultRow item={item} />}
         placeholder="Search by name, e.g. Yosemite"
       />
       <SearchSelect
@@ -54,6 +87,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
         selected={resolvedCampgroundIds}
         onChange={(items) => set("campgroundIds", items)}
         search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
+        renderResult={(item) => <CampgroundResultRow item={item} />}
         placeholder="Search by name"
       />
       <SearchSelect
