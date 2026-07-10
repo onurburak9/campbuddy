@@ -67,3 +67,14 @@ def test_api_secret_key_loaded_from_env(monkeypatch):
     monkeypatch.setenv("API_SECRET_KEY", "my-secret")
     s = Settings(_env_file=None)
     assert s.api_secret_key == "my-secret"
+
+
+def test_ridb_api_key_defaults_empty(env):
+    s = Settings(_env_file=None)
+    assert s.ridb_api_key == ""
+
+
+def test_ridb_api_key_loaded_from_env(env):
+    env.setenv("RIDB_API_KEY", "test-ridb-key")
+    s = Settings(_env_file=None)
+    assert s.ridb_api_key == "test-ridb-key"
