@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import bcrypt
 from jose import jwt, JWTError
+from fastapi import Response
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +47,15 @@ def decode_token(token: str, secret_key: str) -> Optional[int]:
     except (ValueError, KeyError) as e:
         logger.warning("Malformed JWT payload: %s", e)
         return None
+
+
+def issue_session_cookie(response: Response, user_id: int, settings: Settings) -> None:
+    token = create_token(user_id, settings.api_secret_key)
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        max_age=86400,
+    )

@@ -9,6 +9,7 @@ interface AuthCtx {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -27,6 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await auth.login(email, password);
     await qc.invalidateQueries({ queryKey: ["me"] });
   };
+  const register = async (email: string, password: string) => {
+    await auth.register(email, password);
+    await qc.invalidateQueries({ queryKey: ["me"] });
+  };
   const logout = async () => {
     await auth.logout();
     qc.clear();
@@ -34,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ user: data ?? null, isLoading, isAuthenticated: !!data, login, logout }}
+      value={{ user: data ?? null, isLoading, isAuthenticated: !!data, login, register, logout }}
     >
       {children}
     </Ctx.Provider>

@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Index,
     String,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -38,9 +39,12 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_email_active", "email", sqlite_where=text("deleted_at IS NULL"), unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False)
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     recreationgov_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     recreationgov_password: Mapped[Optional[str]] = mapped_column(
