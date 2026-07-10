@@ -73,4 +73,35 @@ describe("SearchSelect", () => {
     await userEvent.type(screen.getByRole("textbox", { name: /recreation areas/i }), "yo");
     await waitFor(() => expect(screen.getByText("Yosemite National Park — CA")).toBeInTheDocument());
   });
+
+  it("hides the results dropdown when clicking outside", async () => {
+    const search = vi.fn().mockResolvedValue([{ id: 2991, name: "Yosemite National Park" }]);
+    render(
+      <div>
+        <SearchSelect label="Recreation Areas" selected={[]} onChange={vi.fn()} search={search} />
+        <button>Outside</button>
+      </div>
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: /recreation areas/i }), "yo");
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Outside" }));
+    expect(screen.queryByText("Yosemite National Park")).not.toBeInTheDocument();
+  });
+
+  it("reopens the results dropdown when typing again after an outside click", async () => {
+    const search = vi.fn().mockResolvedValue([{ id: 2991, name: "Yosemite National Park" }]);
+    render(
+      <div>
+        <SearchSelect label="Recreation Areas" selected={[]} onChange={vi.fn()} search={search} />
+        <button>Outside</button>
+      </div>
+    );
+    const input = screen.getByRole("textbox", { name: /recreation areas/i });
+    await userEvent.type(input, "yo");
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Outside" }));
+    expect(screen.queryByText("Yosemite National Park")).not.toBeInTheDocument();
+    await userEvent.type(input, "s");
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+  });
 });

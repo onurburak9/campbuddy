@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Input } from "./Input";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
@@ -32,6 +32,18 @@ export function SearchSelect<T extends Item>({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addById, setAddById] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -64,6 +76,7 @@ export function SearchSelect<T extends Item>({
     if (!selected.some((s) => s.id === item.id)) onChange([...selected, item]);
     setQuery("");
     setResults([]);
+    setOpen(false);
   }
 
   function remove(id: number) {
@@ -80,7 +93,7 @@ export function SearchSelect<T extends Item>({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" ref={containerRef}>
       <div className="flex flex-wrap gap-1.5">
         {selected.map((item) => (
           <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-forest-100 px-2.5 py-1 text-sm text-forest-800 dark:bg-[#222] dark:text-[#EEE]">
@@ -96,27 +109,34 @@ export function SearchSelect<T extends Item>({
         value={query}
         disabled={disabled}
         placeholder={placeholder}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
       />
-      {loading && <Spinner className="h-4 w-4" />}
-      {error && <p className="text-sm text-[#DC2626]">{error}</p>}
-      {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
-        <p className="text-sm text-stone-500 dark:text-[#888]">No matches — try a different search or add by ID.</p>
-      )}
-      {results.length > 0 && (
-        <ul className="max-h-72 overflow-y-auto rounded-md border border-sand-200 dark:border-[#222]">
-          {results.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                className="block w-full px-3 py-2.5 text-left text-sm hover:bg-sand-100 dark:hover:bg-[#222]"
-                onClick={() => select(item)}
-              >
-                {renderResult ? renderResult(item) : item.name}
-              </button>
-            </li>
-          ))}
-        </ul>
+      {open && (
+        <>
+          {loading && <Spinner className="h-4 w-4" />}
+          {error && <p className="text-sm text-[#DC2626]">{error}</p>}
+          {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
+            <p className="text-sm text-stone-500 dark:text-[#888]">No matches — try a different search or add by ID.</p>
+          )}
+          {results.length > 0 && (
+            <ul className="max-h-72 overflow-y-auto rounded-md border border-sand-200 dark:border-[#222]">
+              {results.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-2.5 text-left text-sm hover:bg-sand-100 dark:hover:bg-[#222]"
+                    onClick={() => select(item)}
+                  >
+                    {renderResult ? renderResult(item) : item.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
       <div className="flex items-end gap-2">
         <Input
