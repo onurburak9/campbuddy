@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationsFields, ProviderSitesFields } from "./ScanForm";
+import { PROVIDERS } from "../../types";
 import type { ScanFormState } from "./useScanFormState";
 
 vi.mock("../../api/search", () => ({
@@ -86,5 +87,15 @@ describe("ProviderSitesFields — id resolution", () => {
     render(wrapWithQueryClient(<ProviderSitesFields state={state} set={() => {}} />));
     expect(screen.getByText("ID 2991")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+  });
+});
+
+describe("ProviderSitesFields — provider selection", () => {
+  it("only enables RecreationDotGov; every other provider option is disabled", () => {
+    render(wrapWithQueryClient(<ProviderSitesFields state={makeState(300)} set={() => {}} />));
+    for (const provider of PROVIDERS) {
+      const option = screen.getByRole("option", { name: provider }) as HTMLOptionElement;
+      expect(option.disabled).toBe(provider !== "RecreationDotGov");
+    }
   });
 });

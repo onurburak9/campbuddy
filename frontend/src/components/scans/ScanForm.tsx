@@ -75,7 +75,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
       <Input label="Scan name (optional)" value={state.name}
         onChange={(e) => set("name", e.target.value)} placeholder="Yosemite summer trip" />
       <Select label="Provider" value={state.provider} onChange={(v) => set("provider", v)}
-        options={PROVIDERS.map((p) => ({ value: p, label: p }))} />
+        options={PROVIDERS.map((p) => ({ value: p, label: p, disabled: p !== "RecreationDotGov" }))} />
       <SearchSelect
         label="Recreation Areas"
         selected={resolvedRecAreaIds}
