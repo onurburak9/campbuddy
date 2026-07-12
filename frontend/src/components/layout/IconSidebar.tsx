@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -16,6 +16,8 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
   const { pathname } = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !onClose) return;
@@ -55,8 +57,22 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAccountMenuOpen(false); };
+    const onClickOutside = (e: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) setAccountMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClickOutside);
+    };
+  }, [accountMenuOpen]);
+
   const closeDrawer = () => onClose?.();
-  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-lg text-xl transition-colors";
+  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-lg transition-colors";
 
   return (
     <>
@@ -77,23 +93,54 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
         )}
       >
         <div className="flex flex-col items-center gap-2">
-          <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-forest-600 text-white" aria-hidden>⛺</div>
-          <Link to="/" onClick={() => { onOpenScans(); closeDrawer(); }} aria-label="Scans"
+          <div className="mb-2 flex h-9 w-9 items-center justify-center" aria-hidden>
+            <img src="/icons/tent.svg" alt="" className="h-6 w-6" />
+          </div>
+          <Link to="/" onClick={() => { onOpenScans(); closeDrawer(); }} aria-label="Scans" title="Scans"
             className={cn(iconBtn, pathname === "/" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
-            <span aria-hidden>⛺</span>
+            <img src="/icons/mountain.svg" alt="" className="h-5 w-5" />
           </Link>
-          <Link to="/settings" onClick={closeDrawer} aria-label="Settings"
+          <Link to="/settings" onClick={closeDrawer} aria-label="Settings" title="Settings"
             className={cn(iconBtn, pathname === "/settings" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
-            <span aria-hidden>⚙️</span>
+            <img src="/icons/gear.svg" alt="" className="h-5 w-5" />
           </Link>
         </div>
-        <div className="flex flex-col items-center gap-2">
-          <button aria-label="Toggle theme" onClick={toggle}
-            className={cn(iconBtn, "hover:bg-sand-100 dark:hover:bg-[#222]")}>
-            <span aria-hidden>{theme === "dark" ? "☀️" : "🌙"}</span>
-          </button>
-          <button aria-label={`Log out ${user?.email ?? ""}`} onClick={() => logout()}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-forest-600 text-sm font-semibold text-white">
+        <div
+          ref={accountMenuRef}
+          className="relative flex flex-col items-center"
+          onMouseEnter={() => setAccountMenuOpen(true)}
+          onMouseLeave={() => setAccountMenuOpen(false)}
+        >
+          {accountMenuOpen && (
+            <div
+              role="menu"
+              className="absolute bottom-0 left-full z-50 ml-2 w-44 rounded-lg border border-sand-200 bg-white py-1 shadow-lg dark:border-[#222] dark:bg-[#1A1A1A]"
+            >
+              <button
+                role="menuitem"
+                onClick={toggle}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+              >
+                <img src={theme === "dark" ? "/icons/sun.svg" : "/icons/moon.svg"} alt="" className="h-4 w-4" />
+                {theme === "dark" ? "Light mode" : "Dark mode"}
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => { setAccountMenuOpen(false); logout(); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+              >
+                <img src="/icons/door.svg" alt="" className="h-4 w-4" />
+                Log out
+              </button>
+            </div>
+          )}
+          <button
+            aria-label={`Account menu for ${user?.email ?? ""}`}
+            aria-expanded={accountMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setAccountMenuOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-forest-600 text-sm font-semibold text-white"
+          >
             {user?.email?.[0]?.toUpperCase() ?? "?"}
           </button>
         </div>

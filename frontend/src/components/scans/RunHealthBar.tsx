@@ -28,15 +28,21 @@ export function RunHealthBar({ runs }: { runs: ScanRun[] }) {
   const ordered = [...runs].slice(0, 20).reverse(); // oldest → newest
   if (ordered.length === 0)
     return <p className="text-sm text-stone-400">No runs yet</p>;
+  const successCount = ordered.filter((run) => run.outcome === "success").length;
   return (
-    <div className="flex items-end gap-1">
-      {ordered.map((run) => (
-        <span
-          key={run.id}
-          title={`${relativeTime(run.started_at)} · ${outcomeLabel(run.outcome)}`}
-          className={cn("h-8 w-2 rounded-sm", barColor[outcomeTone(run.outcome)])}
-        />
-      ))}
+    <div>
+      <p className="mb-1.5 text-xs text-stone-500 dark:text-[#888]">
+        {successCount}/{ordered.length} successful
+      </p>
+      <div className="flex items-end gap-1">
+        {ordered.map((run) => (
+          <span
+            key={run.id}
+            title={`${relativeTime(run.started_at)} · ${outcomeLabel(run.outcome)}`}
+            className={cn("h-8 w-2 rounded-sm", barColor[outcomeTone(run.outcome)])}
+          />
+        ))}
+      </div>
     </div>
   );
 }
