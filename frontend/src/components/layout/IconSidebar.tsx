@@ -18,7 +18,25 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
   const navRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const closeMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  const openAccountMenu = () => {
+    if (closeMenuTimerRef.current) {
+      clearTimeout(closeMenuTimerRef.current);
+      closeMenuTimerRef.current = null;
+    }
+    setAccountMenuOpen(true);
+  };
+  const scheduleCloseAccountMenu = () => {
+    closeMenuTimerRef.current = setTimeout(() => setAccountMenuOpen(false), 250);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimerRef.current) clearTimeout(closeMenuTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open || !onClose) return;
@@ -73,7 +91,7 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
   }, [accountMenuOpen]);
 
   const closeDrawer = () => onClose?.();
-  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-lg transition-colors";
+  const iconBtn = "flex h-12 w-12 items-center justify-center rounded-lg transition-colors";
 
   return (
     <>
@@ -88,49 +106,49 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
       <nav
         ref={navRef}
         className={cn(
-          "flex w-[52px] flex-col items-center justify-between border-r border-sand-200 bg-white py-3 dark:border-[#222] dark:bg-[#1A1A1A]",
+          "flex w-16 flex-col items-center justify-between border-r border-sand-200 bg-white py-3 dark:border-[#222] dark:bg-[#1A1A1A]",
           "fixed left-0 top-0 z-50 h-full transition-transform md:static md:z-auto md:h-auto md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex flex-col items-center gap-2">
-          <div className="mb-2 flex h-9 w-9 items-center justify-center" aria-hidden>
-            <img src="/icons/tent.svg" alt="" className="h-6 w-6" />
+          <div className="mb-2 flex h-12 w-12 items-center justify-center" aria-hidden>
+            <img src="/icons/camping.svg" alt="" className="h-9 w-9" />
           </div>
           <Link to="/" onClick={() => { onOpenScans(); closeDrawer(); }} aria-label="Scans" title="Scans"
             className={cn(iconBtn, pathname === "/" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
-            <img src="/icons/mountain.svg" alt="" className="h-5 w-5" />
+            <img src="/icons/mountain.svg" alt="" className="h-7 w-7" />
           </Link>
           <Link to="/settings" onClick={closeDrawer} aria-label="Settings" title="Settings"
             className={cn(iconBtn, pathname === "/settings" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
-            <img src="/icons/gear.svg" alt="" className="h-5 w-5" />
+            <img src="/icons/gear.svg" alt="" className="h-7 w-7" />
           </Link>
         </div>
         <div
           ref={accountMenuRef}
           className="relative flex flex-col items-center"
-          onMouseEnter={() => setAccountMenuOpen(true)}
-          onMouseLeave={() => setAccountMenuOpen(false)}
+          onMouseEnter={openAccountMenu}
+          onMouseLeave={scheduleCloseAccountMenu}
         >
           {accountMenuOpen && (
             <div
               role="menu"
-              className="absolute bottom-0 left-full z-50 ml-2 w-44 rounded-lg border border-sand-200 bg-white py-1 shadow-lg dark:border-[#222] dark:bg-[#1A1A1A]"
+              className="absolute bottom-0 left-full z-50 ml-2 w-48 rounded-lg border border-sand-200 bg-white py-1 shadow-lg dark:border-[#222] dark:bg-[#1A1A1A]"
             >
               <button
                 role="menuitem"
                 onClick={toggle}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
               >
-                <img src={theme === "dark" ? "/icons/sun.svg" : "/icons/moon.svg"} alt="" className="h-4 w-4" />
+                <img src={theme === "dark" ? "/icons/sun.svg" : "/icons/moon.svg"} alt="" className="h-5 w-5" />
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </button>
               <button
                 role="menuitem"
                 onClick={() => { setAccountMenuOpen(false); logout().then(() => navigate("/login", { replace: true })); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
               >
-                <img src="/icons/door.svg" alt="" className="h-4 w-4" />
+                <img src="/icons/door.svg" alt="" className="h-5 w-5" />
                 Log out
               </button>
             </div>
@@ -139,8 +157,8 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
             aria-label={`Account menu for ${user?.email ?? ""}`}
             aria-expanded={accountMenuOpen}
             aria-haspopup="menu"
-            onClick={() => setAccountMenuOpen(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-forest-600 text-sm font-semibold text-white"
+            onClick={openAccountMenu}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-forest-600 text-base font-semibold text-white"
           >
             {user?.email?.[0]?.toUpperCase() ?? "?"}
           </button>
