@@ -18,6 +18,14 @@ export function useScanRuns(
   });
 }
 
+export function useScanRunsCount(scanId: number | null, outcome?: string, startedAfter?: string) {
+  return useQuery({
+    queryKey: scanId ? queryKeys.runsCount(scanId, outcome, startedAfter) : ["scans", "none", "runs", "count"],
+    queryFn: () => runs.count(scanId as number, outcome, startedAfter),
+    enabled: scanId != null,
+  });
+}
+
 export function useRunResults(scanId: number, runId: number, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.runResults(scanId, runId),

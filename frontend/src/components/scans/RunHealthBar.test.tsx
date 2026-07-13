@@ -13,4 +13,9 @@ describe("RunHealthBar", () => {
     const bars = screen.getAllByTitle(/ago|now/);
     expect(bars).toHaveLength(2);
   });
+
+  it("shows a success/total summary", () => {
+    render(<RunHealthBar runs={[...runs]} />);
+    expect(screen.getByText("1/2 successful")).toBeInTheDocument();
+  });
 });

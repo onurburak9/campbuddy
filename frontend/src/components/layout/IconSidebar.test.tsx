@@ -1,19 +1,35 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 const toggle = vi.fn();
+const logout = vi.fn().mockResolvedValue(undefined);
+const navigate = vi.fn();
 vi.mock("../../contexts/ThemeContext", () => ({ useTheme: () => ({ theme: "light", toggle }) }));
-vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ logout: vi.fn(), user: { email: "a@b.c" } }) }));
+vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ logout, user: { email: "a@b.c" } }) }));
+vi.mock("react-router-dom", async (orig) => ({
+  ...(await orig<typeof import("react-router-dom")>()),
+  useNavigate: () => navigate,
+}));
 
 import { IconSidebar } from "./IconSidebar";
 
 describe("IconSidebar", () => {
-  it("toggles theme when the theme button is clicked", async () => {
+  it("toggles theme from the account menu", async () => {
     render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
-    await userEvent.click(screen.getByRole("button", { name: /theme/i }));
+    await userEvent.click(screen.getByRole("button", { name: /account menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /dark mode/i }));
     expect(toggle).toHaveBeenCalledOnce();
+  });
+
+  it("logs out from the account menu", async () => {
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: /account menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /log out/i }));
+    expect(logout).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/login", { replace: true }));
   });
 
   it("closes on backdrop click when open", async () => {
@@ -86,12 +102,12 @@ describe("IconSidebar", () => {
     render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} open onClose={vi.fn()} /></MemoryRouter>);
 
     const scansLink = screen.getByRole("link", { name: /scans/i });
-    const logoutButton = screen.getByRole("button", { name: /log out/i });
+    const accountMenuButton = screen.getByRole("button", { name: /account menu/i });
 
     expect(document.activeElement).toBe(scansLink);
 
     await user.tab({ shift: true });
-    expect(document.activeElement).toBe(logoutButton);
+    expect(document.activeElement).toBe(accountMenuButton);
 
     await user.tab();
     expect(document.activeElement).toBe(scansLink);

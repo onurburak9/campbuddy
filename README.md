@@ -304,3 +304,9 @@ scans:
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for system design, data flow, and component descriptions.
 Key design decisions are documented as ADRs in [docs/adr/](docs/adr/).
+
+---
+
+## Credits
+
+Sidebar icons (`frontend/public/icons/`) are from [OpenMoji](https://openmoji.org) — the open-source emoji and icon project — licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

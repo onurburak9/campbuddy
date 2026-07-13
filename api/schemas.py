@@ -192,6 +192,10 @@ class ScanStatsResponse(BaseModel):
         orm_mode = True
 
 
+class RunsCountResponse(BaseModel):
+    total: int
+
+
 class ProfileUpdate(BaseModel):
     email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
