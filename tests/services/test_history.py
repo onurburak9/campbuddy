@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, date, timezone, timedelta
 from db.models import Scan, ScanRun, ScanResult, ScanOutcome
-from core.services.history import list_runs, list_results, stats
+from core.services.history import list_runs, list_results, stats, count_runs
 from core.services import history as history_svc
 from core.services.exceptions import NotFound
 from tests.services.conftest import make_user
@@ -50,6 +50,37 @@ def test_list_runs_returns_runs_for_scan(db):
     _make_run(db, scan.id)
     runs = list_runs(db, scan.id, u.id, page=1, page_size=10)
     assert len(runs) == 2
+
+
+def test_count_runs_matches_total_regardless_of_page_size(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    for _ in range(5):
+        _make_run(db, scan.id)
+    assert count_runs(db, scan.id, u.id) == 5
+    page = list_runs(db, scan.id, u.id, page=1, page_size=3)
+    assert len(page) == 3
+
+
+def test_count_runs_respects_outcome_filter(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    _make_run(db, scan.id)
+    error_run = ScanRun(
+        scan_id=scan.id,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+        outcome=ScanOutcome.error,
+        sites_found=0,
+    )
+    db.add(error_run)
+    db.flush()
+    assert count_runs(db, scan.id, u.id, outcome=ScanOutcome.success) == 1
+    assert count_runs(db, scan.id, u.id) == 2
 
 
 def test_list_runs_raises_forbidden_for_wrong_owner(db):

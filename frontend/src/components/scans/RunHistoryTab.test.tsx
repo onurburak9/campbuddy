@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -17,6 +17,24 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("RunHistoryTab", () => {
+  beforeEach(() => {
+    server.use(http.get("/api/v1/scans/7/runs/count", () => HttpResponse.json({ total: 0 })));
+  });
+
+  it("hides Next and shows total pages when the last page is exactly a full page", async () => {
+    const fullPage = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1, scan_id: 7, started_at: "2026-06-24T11:00:00Z", finished_at: "2026-06-24T11:00:08Z",
+      outcome: "success", sites_found: 0, error_message: null,
+    }));
+    server.use(
+      http.get("/api/v1/scans/7/runs", () => HttpResponse.json(fullPage)),
+      http.get("/api/v1/scans/7/runs/count", () => HttpResponse.json({ total: 20 })),
+    );
+    wrap(<RunHistoryTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Page 1 of 1")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+  });
+
   it("passes started_after when a time range is selected", async () => {
     let lastUrl = "";
     server.use(http.get("/api/v1/scans/7/runs", ({ request }) => {

@@ -226,6 +226,7 @@ def test_all_scan_routes_require_auth(client):
         "/api/v1/scans",
         "/api/v1/scans/1",
         "/api/v1/scans/1/runs",
+        "/api/v1/scans/1/runs/count",
         "/api/v1/scans/1/results",
         "/api/v1/scans/1/stats",
     ]:
@@ -251,6 +252,20 @@ def test_runs_outcome_filter(auth_client, scan_with_runs):
     r = client.get(f"/api/v1/scans/{scan_with_runs.id}/runs?outcome=success")
     assert r.status_code == 200
     assert all(item["outcome"] == "success" for item in r.json())
+
+
+def test_runs_count_endpoint(auth_client, scan_with_runs):
+    client, _ = auth_client
+    r = client.get(f"/api/v1/scans/{scan_with_runs.id}/runs/count")
+    assert r.status_code == 200
+    assert r.json() == {"total": 3}
+
+
+def test_runs_count_respects_outcome_filter(auth_client, scan_with_runs):
+    client, _ = auth_client
+    r = client.get(f"/api/v1/scans/{scan_with_runs.id}/runs/count?outcome=no_results")
+    assert r.status_code == 200
+    assert r.json() == {"total": 1}
 
 
 def test_run_results_endpoint(auth_client, scan_with_results):

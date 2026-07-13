@@ -6,6 +6,8 @@ export const queryKeys = {
   stats: (id: number) => ["scans", id, "stats"] as const,
   runs: (id: number, page: number, pageSize: number, outcome?: string, startedAfter?: string) =>
     ["scans", id, "runs", { page, pageSize, outcome: outcome ?? null, startedAfter: startedAfter ?? null }] as const,
+  runsCount: (id: number, outcome?: string, startedAfter?: string) =>
+    ["scans", id, "runs", "count", { outcome: outcome ?? null, startedAfter: startedAfter ?? null }] as const,
   runResults: (id: number, runId: number) =>
     ["scans", id, "runs", runId, "results"] as const,
   results: (id: number, page: number, pageSize: number) =>

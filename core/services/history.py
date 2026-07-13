@@ -3,19 +3,29 @@ from core.services.scans import get_scan
 from core.services.exceptions import NotFound
 
 
-def list_runs(db, scan_id: int, user_id: int, page: int = 1, page_size: int = 20, outcome=None, started_after=None) -> list:
-    get_scan(db, scan_id, user_id)
+def _filtered_runs_query(db, scan_id: int, outcome=None, started_after=None):
     q = db.query(ScanRun).filter(ScanRun.scan_id == scan_id)
     if outcome is not None:
         q = q.filter(ScanRun.outcome == outcome)
     if started_after is not None:
         q = q.filter(ScanRun.started_at >= started_after)
+    return q
+
+
+def list_runs(db, scan_id: int, user_id: int, page: int = 1, page_size: int = 20, outcome=None, started_after=None) -> list:
+    get_scan(db, scan_id, user_id)
+    q = _filtered_runs_query(db, scan_id, outcome, started_after)
     return (
         q.order_by(ScanRun.started_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
+
+
+def count_runs(db, scan_id: int, user_id: int, outcome=None, started_after=None) -> int:
+    get_scan(db, scan_id, user_id)
+    return _filtered_runs_query(db, scan_id, outcome, started_after).count()
 
 
 def list_run_results(db, scan_id: int, run_id: int, user_id: int) -> list:

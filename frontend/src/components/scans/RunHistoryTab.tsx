@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useScanRuns, RUNS_PAGE_SIZE } from "../../hooks/useRuns";
+import { useScanRuns, useScanRunsCount, RUNS_PAGE_SIZE } from "../../hooks/useRuns";
 import { RunRow } from "./RunRow";
 import { Pagination } from "../ui/Pagination";
 import { PageSizeSelect } from "../ui/PageSizeSelect";
@@ -30,9 +30,10 @@ export function RunHistoryTab({ scanId }: { scanId: number }) {
   const [foundOnly, setFoundOnly] = useState(false);
   const [range, setRange] = useState("all");
   const startedAfter = useMemo(() => cutoffISO(range), [range]);
-  const { data: runs, isLoading } = useScanRuns(
-    scanId, page, pageSize, foundOnly ? "success" : undefined, startedAfter,
-  );
+  const outcome = foundOnly ? "success" : undefined;
+  const { data: runs, isLoading } = useScanRuns(scanId, page, pageSize, outcome, startedAfter);
+  const { data: countData } = useScanRunsCount(scanId, outcome, startedAfter);
+  const totalPages = countData ? Math.max(1, Math.ceil(countData.total / pageSize)) : undefined;
 
   return (
     <div>
@@ -52,7 +53,8 @@ export function RunHistoryTab({ scanId }: { scanId: number }) {
           {runs.map((r) => <RunRow key={r.id} scanId={scanId} run={r} />)}
           <Pagination
             page={page}
-            hasNext={runs.length === pageSize}
+            hasNext={totalPages != null ? page < totalPages : runs.length === pageSize}
+            totalPages={totalPages}
             onPrev={() => setPage((p) => Math.max(1, p - 1))}
             onNext={() => setPage((p) => p + 1)}
           />

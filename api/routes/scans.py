@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from api.deps import get_db_dep, get_current_user
-from api.schemas import ScanCreate, ScanUpdate, ScanResponse, ScanRunResponse, ScanResultResponse, ScanStatsResponse
+from api.schemas import ScanCreate, ScanUpdate, ScanResponse, ScanRunResponse, ScanResultResponse, ScanStatsResponse, RunsCountResponse
 from core.services import scans as scans_svc
 from core.services import history as history_svc
 from db.models import ScanOutcome
@@ -61,6 +61,19 @@ def list_runs(
         db, scan_id, user.id, page=page, page_size=page_size,
         outcome=outcome, started_after=started_after,
     )
+
+
+@router.get("/{scan_id}/runs/count", response_model=RunsCountResponse)
+def count_runs(
+    scan_id: int,
+    outcome: Optional[ScanOutcome] = Query(default=None),
+    started_after: Optional[datetime] = Query(default=None),
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
+    return {"total": history_svc.count_runs(
+        db, scan_id, user.id, outcome=outcome, started_after=started_after,
+    )}
 
 
 @router.get("/{scan_id}/runs/{run_id}/results", response_model=List[ScanResultResponse])

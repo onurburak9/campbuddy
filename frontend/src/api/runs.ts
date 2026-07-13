@@ -8,6 +8,12 @@ export const runs = {
         (outcome ? `&outcome=${outcome}` : "") +
         (startedAfter ? `&started_after=${encodeURIComponent(startedAfter)}` : ""),
     ),
+  count: (scanId: number, outcome?: string, startedAfter?: string) =>
+    fetchApi<{ total: number }>(
+      `/scans/${scanId}/runs/count?` +
+        (outcome ? `outcome=${outcome}&` : "") +
+        (startedAfter ? `started_after=${encodeURIComponent(startedAfter)}` : ""),
+    ),
   runResults: (scanId: number, runId: number) =>
     fetchApi<ScanResult[]>(`/scans/${scanId}/runs/${runId}/results`),
 };
