@@ -1,12 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 const toggle = vi.fn();
-const logout = vi.fn();
+const logout = vi.fn().mockResolvedValue(undefined);
+const navigate = vi.fn();
 vi.mock("../../contexts/ThemeContext", () => ({ useTheme: () => ({ theme: "light", toggle }) }));
 vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ logout, user: { email: "a@b.c" } }) }));
+vi.mock("react-router-dom", async (orig) => ({
+  ...(await orig<typeof import("react-router-dom")>()),
+  useNavigate: () => navigate,
+}));
 
 import { IconSidebar } from "./IconSidebar";
 
@@ -24,6 +29,7 @@ describe("IconSidebar", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: /log out/i }));
     expect(logout).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/login", { replace: true }));
   });
 
   it("closes on backdrop click when open", async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/cn";
@@ -14,6 +14,7 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
   const { theme, toggle } = useTheme();
   const { logout, user } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const navRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -126,7 +127,7 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
               </button>
               <button
                 role="menuitem"
-                onClick={() => { setAccountMenuOpen(false); logout(); }}
+                onClick={() => { setAccountMenuOpen(false); logout().then(() => navigate("/login", { replace: true })); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
               >
                 <img src="/icons/door.svg" alt="" className="h-4 w-4" />
