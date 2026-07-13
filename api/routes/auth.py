@@ -1,12 +1,12 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
-from api.auth import verify_password, create_token, hash_password, COOKIE_NAME
+from api.auth import verify_password, hash_password, COOKIE_NAME, issue_session_cookie
 from api.deps import get_db_dep, get_current_user
-from api.schemas import LoginRequest, MeResponse
+from api.schemas import LoginRequest, RegisterRequest, MeResponse
 from config.settings import get_settings
-from core.services.users import get_user_by_email, scans_used
-from core.services.exceptions import NotFound
+from core.services.users import get_user_by_email, register_user, scans_used
+from core.services.exceptions import NotFound, InvalidState
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +28,20 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db_d
         logger.warning("Failed login attempt for email=%s", body.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     settings = get_settings()
-    token = create_token(user.id, settings.api_secret_key)
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
-        max_age=86400,
-    )
+    issue_session_cookie(response, user.id, settings)
+    return {"ok": True}
+
+
+@router.post("/register")
+def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db_dep)):
+    settings = get_settings()
+    if not settings.registration_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is currently disabled")
+    try:
+        user = register_user(db, body.email, hash_password(body.password))
+    except InvalidState:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
+    issue_session_cookie(response, user.id, settings)
     return {"ok": True}
 
 

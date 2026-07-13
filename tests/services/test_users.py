@@ -1,8 +1,8 @@
 import pytest
 from db.models import User, Scan
-from core.services.users import get_user_by_email, update_profile, scans_used
+from core.services.users import get_user_by_email, update_profile, scans_used, register_user
 from core.services import scans as scans_svc
-from core.services.exceptions import NotFound
+from core.services.exceptions import NotFound, InvalidState
 from core.crypto import encrypt_password
 from tests.services.conftest import make_user
 
@@ -94,3 +94,35 @@ def test_clearing_recgov_password_disables_autobook(db):
 
     refreshed = db.query(Scan).filter(Scan.id == scan.id).first()
     assert refreshed.auto_book is False
+
+
+def test_register_user_creates_user_with_hashed_password(db):
+    user = register_user(db, "new@e.com", "already-hashed-value")
+    assert user.id is not None
+    assert user.email == "new@e.com"
+    assert user.hashed_password == "already-hashed-value"
+
+
+def test_register_user_defaults_scan_limit_to_five(db):
+    user = register_user(db, "new@e.com", "hashed")
+    assert user.scan_limit == 5
+
+
+def test_register_user_leaves_recreationgov_fields_unset(db):
+    user = register_user(db, "new@e.com", "hashed")
+    assert user.recreationgov_email is None
+    assert user.recreationgov_password is None
+
+
+def test_register_user_raises_invalid_state_for_duplicate_email(db):
+    make_user(db, "dup@e.com")
+    with pytest.raises(InvalidState):
+        register_user(db, "dup@e.com", "hashed")
+
+
+def test_register_user_allows_email_reused_after_soft_delete(db):
+    existing = make_user(db, "gone@e.com")
+    existing.deleted_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    db.flush()
+    user = register_user(db, "gone@e.com", "hashed")
+    assert user.id != existing.id

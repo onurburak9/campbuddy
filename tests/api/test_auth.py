@@ -134,3 +134,51 @@ def test_soft_deleted_user_with_valid_jwt_returns_401(client, user_in_db):
         user.deleted_at = datetime.now(timezone.utc)
     resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
+
+
+def test_register_creates_user_and_sets_cookie(client):
+    resp = client.post("/api/v1/auth/register", json={"email": "brand-new@e.com", "password": "longenough"})
+    assert resp.status_code == 200
+    assert "campbuddy_session" in resp.cookies
+    with get_db(api_db.get_factory()) as db:
+        user = db.query(User).filter(User.email == "brand-new@e.com").first()
+        assert user is not None
+        assert user.scan_limit == 5
+
+
+def test_register_then_me_returns_new_user(client):
+    client.post("/api/v1/auth/register", json={"email": "brand-new@e.com", "password": "longenough"})
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "brand-new@e.com"
+
+
+def test_register_duplicate_email_returns_409(client, user_in_db):
+    resp = client.post("/api/v1/auth/register", json={"email": "user@example.com", "password": "longenough"})
+    assert resp.status_code == 409
+
+
+def test_register_short_password_returns_422(client):
+    resp = client.post("/api/v1/auth/register", json={"email": "brand-new@e.com", "password": "short"})
+    assert resp.status_code == 422
+
+
+def test_register_malformed_email_returns_422(client):
+    resp = client.post("/api/v1/auth/register", json={"email": "not-an-email", "password": "longenough"})
+    assert resp.status_code == 422
+
+
+def test_register_email_with_trailing_newline_returns_422(client):
+    resp = client.post("/api/v1/auth/register", json={"email": "a@b.c\n", "password": "longenough"})
+    assert resp.status_code == 422
+
+
+def test_register_disabled_returns_403(client, monkeypatch):
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("REGISTRATION_ENABLED", "false")
+    try:
+        resp = client.post("/api/v1/auth/register", json={"email": "brand-new@e.com", "password": "longenough"})
+        assert resp.status_code == 403
+    finally:
+        get_settings.cache_clear()

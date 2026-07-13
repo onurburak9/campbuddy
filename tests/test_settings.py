@@ -78,3 +78,12 @@ def test_ridb_api_key_loaded_from_env(env):
     env.setenv("RIDB_API_KEY", "test-ridb-key")
     s = Settings(_env_file=None)
     assert s.ridb_api_key == "test-ridb-key"
+def test_registration_enabled_defaults_true(env):
+    s = Settings(_env_file=None)
+    assert s.registration_enabled is True
+
+
+def test_registration_enabled_can_be_disabled(env):
+    env.setenv("REGISTRATION_ENABLED", "false")
+    s = Settings(_env_file=None)
+    assert s.registration_enabled is False

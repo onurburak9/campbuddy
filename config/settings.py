@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     api_secret_key: str = ""
     cookie_secure: bool = False
     ridb_api_key: str = ""
+    registration_enabled: bool = True
 
     class Config:
         env_file = ".env"
