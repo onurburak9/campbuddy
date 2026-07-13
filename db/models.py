@@ -14,10 +14,37 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """DateTime that always round-trips as UTC-aware.
+
+    SQLite drops tzinfo on DateTime(timezone=True) columns, so a naive
+    datetime read back from the DB would otherwise get serialized without
+    a UTC marker and get misinterpreted as local time by API clients.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: Optional[datetime], dialect) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value: Optional[datetime], dialect) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 class ScanStatus(str, enum.Enum):
@@ -47,10 +74,10 @@ class User(Base):
         String(256), nullable=True, comment="Fernet-encrypted; key in ENCRYPTION_KEY env"
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        UTCDateTime, default=_utcnow
     )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime, nullable=True
     )
     hashed_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     scan_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
@@ -87,10 +114,10 @@ class Scan(Base):
     notify_on_new_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     auto_book: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        UTCDateTime, default=_utcnow
     )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime, nullable=True
     )
 
     user: Mapped["User"] = relationship(back_populates="scans")
@@ -109,9 +136,9 @@ class ScanRun(Base):
     scan_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("scans.id"), nullable=False, index=True
     )
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     finished_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime, nullable=True
     )
     outcome: Mapped[Optional[ScanOutcome]] = mapped_column(
         SQLEnum(ScanOutcome, native_enum=False), nullable=True
@@ -143,16 +170,16 @@ class ScanResult(Base):
     booking_date: Mapped[date] = mapped_column(Date, nullable=False)
     booking_end_date: Mapped[date] = mapped_column(Date, nullable=False)
     booking_url: Mapped[str] = mapped_column(String, nullable=False)
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     cart_added: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cart_added_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime, nullable=True
     )
     notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notified_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime, nullable=True
     )
 
     run: Mapped["ScanRun"] = relationship(back_populates="results")

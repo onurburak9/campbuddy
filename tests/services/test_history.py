@@ -311,8 +311,6 @@ def test_list_runs_filters_by_started_after(db, seeded_scan_with_runs):
     scan = seeded_scan_with_runs  # has runs across a range of started_at
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     recent = history_svc.list_runs(db, scan.id, scan.user_id, started_after=cutoff)
-    # SQLite returns naive datetimes; compare with a naive cutoff for assertion
-    cutoff_naive = cutoff.replace(tzinfo=None)
-    assert all(r.started_at >= cutoff_naive for r in recent)
+    assert all(r.started_at >= cutoff for r in recent)
     all_runs = history_svc.list_runs(db, scan.id, scan.user_id)
     assert len(recent) <= len(all_runs)

@@ -129,7 +129,7 @@ def test_scan_result_defaults(db):
     assert result.cart_added is False
     assert result.notified is False
     assert result.cart_added_at is None
-    assert result.last_seen_at == now.replace(tzinfo=None)
+    assert result.last_seen_at == now
     assert result.is_available is True  # column default applied on insert
 
 
