@@ -1,12 +1,17 @@
 import { useState, useCallback } from "react";
 import type { Scan, ScanCreatePayload, ScanUpdatePayload, SearchWindow } from "../../types";
 
+export interface SelectedItem {
+  id: number;
+  name: string;
+}
+
 export interface ScanFormState {
   name: string;
   provider: string;
-  recAreaIds: string;
-  campgroundIds: string;
-  campsiteIds: string;
+  recAreaIds: SelectedItem[];
+  campgroundIds: SelectedItem[];
+  campsiteIds: SelectedItem[];
   windows: SearchWindow[];
   nights: number;
   daysOfWeek: number[];
@@ -17,13 +22,17 @@ export interface ScanFormState {
   notifyNewOnly: boolean;
 }
 
+function idsAsFallbackItems(ids: number[] | null | undefined): SelectedItem[] {
+  return (ids ?? []).map((id) => ({ id, name: `ID ${id}` }));
+}
+
 function fromScan(scan?: Scan): ScanFormState {
   return {
     name: scan?.name ?? "",
     provider: scan?.provider ?? "RecreationDotGov",
-    recAreaIds: scan?.rec_area_ids?.join(", ") ?? "",
-    campgroundIds: scan?.campground_ids?.join(", ") ?? "",
-    campsiteIds: scan?.campsite_ids?.join(", ") ?? "",
+    recAreaIds: idsAsFallbackItems(scan?.rec_area_ids),
+    campgroundIds: idsAsFallbackItems(scan?.campground_ids),
+    campsiteIds: idsAsFallbackItems(scan?.campsite_ids),
     windows: scan?.search_windows ?? [],
     nights: scan?.nights ?? 1,
     daysOfWeek: scan?.days_of_week ?? [],
@@ -33,16 +42,6 @@ function fromScan(scan?: Scan): ScanFormState {
     notifyTelegram: scan?.notify_via_telegram ?? false,
     notifyNewOnly: scan?.notify_on_new_only ?? true,
   };
-}
-
-function parseIds(csv: string): number[] | null {
-  const ids = csv
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map(Number)
-    .filter((n) => !Number.isNaN(n));
-  return ids.length ? ids : null;
 }
 
 export function useScanFormState(scan?: Scan) {
@@ -56,9 +55,9 @@ export function useScanFormState(scan?: Scan) {
     provider: state.provider,
     name: state.name.trim() || null,
     polling_interval: state.pollingInterval,
-    rec_area_ids: parseIds(state.recAreaIds),
-    campground_ids: parseIds(state.campgroundIds),
-    campsite_ids: parseIds(state.campsiteIds),
+    rec_area_ids: state.recAreaIds.length ? state.recAreaIds.map((i) => i.id) : null,
+    campground_ids: state.campgroundIds.length ? state.campgroundIds.map((i) => i.id) : null,
+    campsite_ids: state.campsiteIds.length ? state.campsiteIds.map((i) => i.id) : null,
     search_windows: state.windows,
     nights: state.nights,
     days_of_week: state.daysOfWeek.length ? state.daysOfWeek : null,

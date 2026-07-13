@@ -17,7 +17,7 @@ export function ScanWizardPanel({ onClose, onCreated }: {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const hasAnyIds = !!(form.state.recAreaIds.trim() || form.state.campgroundIds.trim() || form.state.campsiteIds.trim());
+  const hasAnyIds = form.state.recAreaIds.length > 0 || form.state.campgroundIds.length > 0 || form.state.campsiteIds.length > 0;
   const validWindows = form.state.windows.length > 0 && form.state.windows.every((w) => w.start_date && w.end_date);
 
   function next() {

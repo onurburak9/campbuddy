@@ -1,8 +1,12 @@
+from datetime import date, timedelta
 from unittest.mock import MagicMock
 
 import pytest
 
 from core.availability import check_availability
+
+FUTURE_START = date.today() + timedelta(days=30)
+FUTURE_END = FUTURE_START + timedelta(days=3)
 
 
 def make_scan(**overrides):
@@ -12,7 +16,9 @@ def make_scan(**overrides):
     scan.rec_area_ids = [1076]
     scan.campground_ids = None
     scan.campsite_ids = None
-    scan.search_windows = [{"start_date": "2026-07-03", "end_date": "2026-07-06"}]
+    scan.search_windows = [
+        {"start_date": FUTURE_START.isoformat(), "end_date": FUTURE_END.isoformat()}
+    ]
     scan.nights = 3
     scan.weekends_only = False
     scan.days_of_week = None
@@ -54,8 +60,11 @@ def test_multiple_search_windows_passed(mocker):
     patch_provider(mocker, mock_cls)
 
     scan = make_scan(search_windows=[
-        {"start_date": "2026-07-03", "end_date": "2026-07-06"},
-        {"start_date": "2026-07-10", "end_date": "2026-07-13"},
+        {"start_date": FUTURE_START.isoformat(), "end_date": FUTURE_END.isoformat()},
+        {
+            "start_date": (FUTURE_START + timedelta(days=7)).isoformat(),
+            "end_date": (FUTURE_END + timedelta(days=7)).isoformat(),
+        },
     ])
     check_availability(scan)
 

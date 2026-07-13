@@ -1,11 +1,49 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { SearchSelect } from "../ui/SearchSelect";
+import { Badge } from "../ui/Badge";
 import { Toggle } from "../ui/Toggle";
 import { Button } from "../ui/Button";
 import { PROVIDERS } from "../../types";
-import type { ScanFormState } from "./useScanFormState";
+import { search } from "../../api/search";
+import type { RecreationAreaResult, CampgroundResult } from "../../api/search";
+import type { ScanFormState, SelectedItem } from "./useScanFormState";
 import type { SearchWindow } from "../../types";
 import { formatInterval } from "../../lib/format";
+
+// SearchSelect's generic is inferred as SelectedItem (id/name only) from the
+// selected/onChange contract, but at runtime the results here always come
+// straight from search.recreationAreas()/campgrounds(), so the fuller shape
+// is safe to assume for display purposes.
+function RecreationAreaResultRow({ item }: { item: SelectedItem }) {
+  const full = item as unknown as RecreationAreaResult;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-stone-900 dark:text-[#EEE]">{full.name}</p>
+        <p className="truncate text-xs text-stone-500 dark:text-[#888]">
+          ID {full.id}{full.type && ` · ${full.type}`}
+        </p>
+      </div>
+      {full.state && <Badge tone="neutral">{full.state}</Badge>}
+    </div>
+  );
+}
+
+function CampgroundResultRow({ item }: { item: SelectedItem }) {
+  const full = item as unknown as CampgroundResult;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-stone-900 dark:text-[#EEE]">{full.name}</p>
+        <p className="truncate text-xs text-stone-500 dark:text-[#888]">{full.recreation_area}</p>
+      </div>
+      <Badge tone="neutral">ID {full.id}</Badge>
+    </div>
+  );
+}
 
 type Setter = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) => void;
 
@@ -25,20 +63,71 @@ const POLLING_OPTIONS = [
 ];
 
 export function ProviderSitesFields({ state, set }: { state: ScanFormState; set: Setter }) {
+  const resolvedRecAreaIds = useResolveFallbackLabels(state.recAreaIds, search.resolveRecreationAreas, (items) => set("recAreaIds", items));
+  const resolvedCampgroundIds = useResolveFallbackLabels(state.campgroundIds, search.resolveCampgrounds, (items) => set("campgroundIds", items));
+  const resolvedCampsiteIds = useResolveFallbackLabels(state.campsiteIds, search.resolveCampsites, (items) => set("campsiteIds", items));
+
+  const recAreaIds = resolvedRecAreaIds.map((i) => i.id);
+  const campgroundIds = resolvedCampgroundIds.map((i) => i.id);
+
   return (
     <div className="space-y-4">
       <Input label="Scan name (optional)" value={state.name}
         onChange={(e) => set("name", e.target.value)} placeholder="Yosemite summer trip" />
       <Select label="Provider" value={state.provider} onChange={(v) => set("provider", v)}
-        options={PROVIDERS.map((p) => ({ value: p, label: p }))} />
-      <Input label="Recreation Area IDs (comma-separated)" value={state.recAreaIds}
-        onChange={(e) => set("recAreaIds", e.target.value)} placeholder="2991, 2992" />
-      <Input label="Campground IDs (optional)" value={state.campgroundIds}
-        onChange={(e) => set("campgroundIds", e.target.value)} />
-      <Input label="Campsite IDs (optional)" value={state.campsiteIds}
-        onChange={(e) => set("campsiteIds", e.target.value)} />
+        options={PROVIDERS.map((p) => ({ value: p, label: p, disabled: p !== "RecreationDotGov" }))} />
+      <SearchSelect
+        label="Recreation Areas"
+        selected={resolvedRecAreaIds}
+        onChange={(items) => set("recAreaIds", items)}
+        search={(q) => search.recreationAreas(q)}
+        renderResult={(item) => <RecreationAreaResultRow item={item} />}
+        placeholder="Search by name, e.g. Yosemite"
+      />
+      <SearchSelect
+        label="Campgrounds (optional)"
+        selected={resolvedCampgroundIds}
+        onChange={(items) => set("campgroundIds", items)}
+        search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
+        renderResult={(item) => <CampgroundResultRow item={item} />}
+        placeholder="Search by name"
+      />
+      <SearchSelect
+        label="Campsites (optional)"
+        selected={resolvedCampsiteIds}
+        onChange={(items) => set("campsiteIds", items)}
+        search={() => (campgroundIds.length ? search.campsites(campgroundIds) : Promise.resolve([]))}
+        disabled={campgroundIds.length === 0}
+        placeholder={campgroundIds.length ? "Search by site name" : "Select a campground first"}
+      />
     </div>
   );
+}
+
+function useResolveFallbackLabels(
+  items: SelectedItem[],
+  resolve: (ids: number[]) => Promise<SelectedItem[]>,
+  apply: (items: SelectedItem[]) => void,
+): SelectedItem[] {
+  const fallbackIds = items.filter((i) => i.name === `ID ${i.id}`).map((i) => i.id);
+  const { data } = useQuery({
+    queryKey: ["resolve-ids", resolve.name, fallbackIds],
+    queryFn: () => resolve(fallbackIds),
+    enabled: fallbackIds.length > 0,
+    staleTime: Infinity,
+  });
+
+  const resolved = data && data.length > 0
+    ? items.map((i) => data.find((d) => d.id === i.id) ?? i)
+    : items;
+
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+    if (resolved.some((u, idx) => u !== items[idx])) apply(resolved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  return resolved;
 }
 
 export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: Setter }) {

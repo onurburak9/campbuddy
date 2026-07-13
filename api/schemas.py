@@ -208,3 +208,24 @@ class ProfileResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class RecreationAreaResult(BaseModel):
+    id: int
+    name: str
+    state: Optional[str] = None
+    type: Optional[str] = None
+
+
+class CampgroundResult(BaseModel):
+    id: int
+    name: str
+    recreation_area: str
+    recreation_area_id: int
+
+
+class CampsiteResult(BaseModel):
+    id: int
+    name: str
+    loop: str
+    campground_id: int
