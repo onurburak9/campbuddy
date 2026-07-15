@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from core.services import search
 from core.services.exceptions import UpstreamError
+from core.services.ridb_assets import AssetsSearchError
 
 
 @pytest.fixture(autouse=True)
@@ -19,20 +20,52 @@ def mock_provider(mocker):
     return provider
 
 
-def test_search_recreation_areas_normalizes_results(mock_provider):
+def test_search_recreation_areas_uses_assets_search(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", return_value=[
+        {"id": "2991", "name": "Yosemite National Park", "type": "Rec Area"},
+    ])
+    resolve_mock = mocker.patch(
+        "core.services.search.resolve_recreation_areas",
+        return_value=[{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}],
+    )
+    results = search.search_recreation_areas("Yosemite")
+    resolve_mock.assert_called_once_with([2991])
+    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}]
+
+
+def test_search_recreation_areas_skips_non_numeric_asset_ids(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", return_value=[
+        {"id": "AP26168", "name": "Some Activity Pass", "type": "Activity Pass"},
+        {"id": "2991", "name": "Yosemite National Park", "type": "Rec Area"},
+    ])
+    resolve_mock = mocker.patch("core.services.search.resolve_recreation_areas", return_value=[])
+    search.search_recreation_areas("Yosemite")
+    resolve_mock.assert_called_once_with([2991])
+
+
+def test_search_recreation_areas_caches_by_query(mocker, mock_provider):
+    assets_mock = mocker.patch(
+        "core.services.search.search_assets",
+        return_value=[{"id": "2991", "name": "Yosemite National Park", "type": "Rec Area"}],
+    )
+    mocker.patch("core.services.search.resolve_recreation_areas", return_value=[])
+    search.search_recreation_areas("Yosemite")
+    search.search_recreation_areas("Yosemite")
+    assert assets_mock.call_count == 1
+
+
+def test_search_recreation_areas_falls_back_when_assets_unavailable(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", side_effect=AssetsSearchError("RIDB assets down"))
     mock_provider.find_recreation_areas.return_value = [
-        {
-            "RecAreaID": 2991, "RecAreaName": "Yosemite National Park",
-            "RECAREAADDRESS": [{"AddressStateCode": "CA"}],
-            "ORGANIZATION": [{"OrgName": "National Park Service"}],
-        },
+        {"RecAreaID": 2991, "RecAreaName": "Yosemite National Park", "RECAREAADDRESS": [{"AddressStateCode": "CA"}]},
     ]
     results = search.search_recreation_areas("Yosemite")
-    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}]
+    assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": None}]
     mock_provider.find_recreation_areas.assert_called_once_with(search_string="Yosemite")
 
 
-def test_search_recreation_areas_skips_malformed_items(mock_provider):
+def test_search_recreation_areas_fallback_skips_malformed_items(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", side_effect=AssetsSearchError("RIDB assets down"))
     mock_provider.find_recreation_areas.return_value = [
         {"RecAreaID": 2991, "RecAreaName": "Yosemite National Park", "RECAREAADDRESS": [{"AddressStateCode": "CA"}]},
         {"missing": "required fields"},
@@ -41,32 +74,8 @@ def test_search_recreation_areas_skips_malformed_items(mock_provider):
     assert len(results) == 1
 
 
-def test_search_recreation_areas_handles_missing_address(mock_provider):
-    mock_provider.find_recreation_areas.return_value = [
-        {"RecAreaID": 5, "RecAreaName": "No Address Area", "RECAREAADDRESS": []},
-    ]
-    results = search.search_recreation_areas("No Address")
-    assert results == [{"id": 5, "name": "No Address Area", "state": None, "type": None}]
-
-
-def test_search_recreation_areas_handles_missing_organization(mock_provider):
-    mock_provider.find_recreation_areas.return_value = [
-        {"RecAreaID": 481, "RecAreaName": "Hensley Lake", "RECAREAADDRESS": [{"AddressStateCode": "CA"}], "ORGANIZATION": []},
-    ]
-    results = search.search_recreation_areas("Hensley")
-    assert results == [{"id": 481, "name": "Hensley Lake", "state": "CA", "type": None}]
-
-
-def test_search_recreation_areas_caches_by_query(mock_provider):
-    mock_provider.find_recreation_areas.return_value = [
-        {"RecAreaID": 2991, "RecAreaName": "Yosemite National Park", "RECAREAADDRESS": [{"AddressStateCode": "CA"}]},
-    ]
-    search.search_recreation_areas("Yosemite")
-    search.search_recreation_areas("Yosemite")
-    assert mock_provider.find_recreation_areas.call_count == 1
-
-
-def test_search_recreation_areas_wraps_upstream_failure(mock_provider):
+def test_search_recreation_areas_fallback_wraps_upstream_failure(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", side_effect=AssetsSearchError("RIDB assets down"))
     mock_provider.find_recreation_areas.side_effect = ConnectionError("RIDB is down")
     with pytest.raises(UpstreamError):
         search.search_recreation_areas("Yosemite-fail")

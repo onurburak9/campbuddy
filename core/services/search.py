@@ -1,3 +1,4 @@
+import logging
 from functools import lru_cache
 from typing import Optional
 
@@ -7,6 +8,9 @@ from camply.containers.api_responses import RecreationAreaResponse
 
 from config.settings import get_settings
 from core.services.exceptions import UpstreamError
+from core.services.ridb_assets import AssetsSearchError, search_assets
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -25,8 +29,29 @@ def _normalize_recreation_area(response: RecreationAreaResponse, raw: dict) -> d
     return {"id": response.RecAreaID, "name": response.RecAreaName, "state": state, "type": org_type}
 
 
+def _extract_asset_ids(assets: list, expected_type: Optional[str] = None) -> list:
+    ids = []
+    for item in assets:
+        if expected_type and item.get("type") != expected_type:
+            continue
+        try:
+            ids.append(int(item["id"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return ids
+
+
 @lru_cache(maxsize=128)
 def search_recreation_areas(query: str) -> list:
+    try:
+        assets = search_assets(query, "recarea")
+    except AssetsSearchError as e:
+        logger.warning("RIDB assets search unavailable (%s), falling back to recareas query search", e)
+        return _search_recreation_areas_fallback(query)
+    return resolve_recreation_areas(_extract_asset_ids(assets))
+
+
+def _search_recreation_areas_fallback(query: str) -> list:
     provider = _get_provider()
     try:
         raw = provider.find_recreation_areas(search_string=query)
