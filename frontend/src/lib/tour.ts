@@ -71,8 +71,9 @@ export function startWizardProviderTour(): () => void {
         popover: {
           title: "Narrow it down (optional)",
           description:
-            "Optionally narrow down to a specific campground or campsite once you've picked a " +
-            "Recreation Area — leave these blank to monitor the whole Recreation Area.",
+            "Optional, and independent of the Recreation Area above — set a Campground or " +
+            "Campsite ID on their own, or combine them. A Recreation Area, a Campground, and a " +
+            "Campsite ID all work on their own; you don't need to pick one before the others.",
         },
       },
     ],
