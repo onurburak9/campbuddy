@@ -119,7 +119,7 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
             className={cn(iconBtn, pathname === "/" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
             <img src="/icons/mountain.svg" alt="" className="h-7 w-7" />
           </Link>
-          <Link to="/settings" onClick={closeDrawer} aria-label="Settings" title="Settings"
+          <Link to="/settings" data-tour="settings-link" onClick={closeDrawer} aria-label="Settings" title="Settings"
             className={cn(iconBtn, pathname === "/settings" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
             <img src="/icons/gear.svg" alt="" className="h-7 w-7" />
           </Link>
