@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { driveMock, driverMock } = vi.hoisted(() => {
   const driveMock = vi.fn();
-  const driverMock = vi.fn(() => ({ drive: driveMock }));
+  const driverMock = vi.fn((_config: any) => ({ drive: driveMock }));
   return { driveMock, driverMock };
 });
 
