@@ -13,7 +13,12 @@ export function hasSeenWizardTour(): boolean {
   return localStorage.getItem(WIZARD_SEEN_KEY) === "1";
 }
 
+function tourAlreadyActive(): boolean {
+  return document.querySelector(".driver-popover") !== null;
+}
+
 export function startWelcomeTour(): void {
+  if (tourAlreadyActive()) return;
   driver({
     showProgress: true,
     onDestroyed: () => localStorage.setItem(WELCOME_SEEN_KEY, "1"),
@@ -44,6 +49,7 @@ export function startWelcomeTour(): void {
 }
 
 export function startWizardProviderTour(): void {
+  if (tourAlreadyActive()) return;
   driver({
     showProgress: true,
     onDestroyed: () => localStorage.setItem(WIZARD_SEEN_KEY, "1"),

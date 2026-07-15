@@ -18,8 +18,16 @@ import {
 describe("tour", () => {
   beforeEach(() => {
     localStorage.clear();
+    document.body.innerHTML = "";
     driverMock.mockClear();
     driveMock.mockClear();
+  });
+
+  it("does not start a second tour while one's popover is already in the DOM", () => {
+    document.body.innerHTML = '<div class="driver-popover"></div>';
+    startWelcomeTour();
+    startWizardProviderTour();
+    expect(driverMock).not.toHaveBeenCalled();
   });
 
   describe("welcome tour", () => {
