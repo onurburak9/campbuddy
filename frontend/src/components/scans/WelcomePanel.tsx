@@ -3,7 +3,8 @@ import { hasSeenWelcomeTour, startWelcomeTour } from "../../lib/tour";
 
 export function WelcomePanel() {
   useEffect(() => {
-    if (!hasSeenWelcomeTour()) startWelcomeTour();
+    if (hasSeenWelcomeTour()) return;
+    return startWelcomeTour();
   }, []);
 
   return (

@@ -36,7 +36,8 @@ export function ScanWizardPanel({ onClose, onCreated }: {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasSeenWizardTour()) startWizardProviderTour();
+    if (hasSeenWizardTour()) return;
+    return startWizardProviderTour();
   }, []);
 
   const hasAnyIds = form.state.recAreaIds.length > 0 || form.state.campgroundIds.length > 0 || form.state.campsiteIds.length > 0;

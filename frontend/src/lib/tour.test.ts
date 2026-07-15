@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { driveMock, driverMock } = vi.hoisted(() => {
+const { driveMock, destroyMock, driverMock } = vi.hoisted(() => {
   const driveMock = vi.fn();
-  const driverMock = vi.fn((_config: any) => ({ drive: driveMock }));
-  return { driveMock, driverMock };
+  const destroyMock = vi.fn();
+  const driverMock = vi.fn((_config: any) => ({ drive: driveMock, destroy: destroyMock }));
+  return { driveMock, destroyMock, driverMock };
 });
 
 vi.mock("driver.js", () => ({ driver: driverMock }));
@@ -18,16 +19,16 @@ import {
 describe("tour", () => {
   beforeEach(() => {
     localStorage.clear();
-    document.body.innerHTML = "";
     driverMock.mockClear();
     driveMock.mockClear();
+    destroyMock.mockClear();
   });
 
-  it("does not start a second tour while one's popover is already in the DOM", () => {
-    document.body.innerHTML = '<div class="driver-popover"></div>';
-    startWelcomeTour();
-    startWizardProviderTour();
-    expect(driverMock).not.toHaveBeenCalled();
+  it("returns a stop function that destroys the driver instance", () => {
+    const stop = startWelcomeTour();
+    expect(destroyMock).not.toHaveBeenCalled();
+    stop();
+    expect(destroyMock).toHaveBeenCalledTimes(1);
   });
 
   describe("welcome tour", () => {
