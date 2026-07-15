@@ -242,3 +242,16 @@ def test_update_scan_rejects_new_window_shorter_than_existing_nights(db):
     shorter = [{"start_date": "2026-09-01", "end_date": "2026-09-02"}]
     with pytest.raises(ValidationFailed):
         update_scan(db, scan.id, u.id, {"search_windows": shorter})
+
+
+def test_update_scan_allows_unrelated_field_on_legacy_over_limit_scan(db):
+    """A scan created before this validation existed may already have nights >
+    its window. Editing a field that isn't nights/search_windows must not
+    retroactively re-validate and lock the scan out of edits."""
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, nights=10)
+    db.add(scan)
+    db.flush()
+    updated = update_scan(db, scan.id, u.id, {"name": "Legacy scan"})
+    assert updated.name == "Legacy scan"
+    assert updated.nights == 10

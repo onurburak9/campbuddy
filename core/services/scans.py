@@ -75,9 +75,10 @@ def update_scan(db, scan_id: int, user_id: int, data: dict) -> Scan:
     scan = get_scan(db, scan_id, user_id)
     effective_auto_book = data.get("auto_book", scan.auto_book)
     _require_creds_for_autobook(scan.user, bool(effective_auto_book))
-    effective_nights = data.get("nights", scan.nights)
-    effective_windows = data.get("search_windows", scan.search_windows)
-    _require_nights_fit_windows(effective_nights, effective_windows)
+    if "nights" in data or "search_windows" in data:
+        effective_nights = data.get("nights", scan.nights)
+        effective_windows = data.get("search_windows", scan.search_windows)
+        _require_nights_fit_windows(effective_nights, effective_windows)
     for key, value in data.items():
         if key not in _UPDATABLE:
             continue
