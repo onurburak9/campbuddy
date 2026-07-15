@@ -6,7 +6,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { server } from "../../test/server";
 
 vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, email: "a@b.c", has_telegram: true } }) }));
+vi.mock("../../lib/tour");
+
 import { ScanWizardPanel } from "./ScanWizardPanel";
+import { startWizardProviderTour, hasSeenWizardTour } from "../../lib/tour";
+
+const startWizardProviderTourMock = vi.mocked(startWizardProviderTour);
+const hasSeenWizardTourMock = vi.mocked(hasSeenWizardTour);
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -56,5 +62,33 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
+  });
+
+  beforeEach(() => {
+    startWizardProviderTourMock.mockClear();
+    hasSeenWizardTourMock.mockClear();
+    hasSeenWizardTourMock.mockReturnValue(true);
+  });
+
+  it("auto-starts the provider tour on mount when it hasn't been seen", () => {
+    hasSeenWizardTourMock.mockReturnValue(false);
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    expect(startWizardProviderTourMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-start the provider tour on mount when it has already been seen", () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    expect(startWizardProviderTourMock).not.toHaveBeenCalled();
+  });
+
+  it("replays the provider tour via the help icon, and hides the icon once past step 1", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    await userEvent.click(screen.getAllByRole("button", { name: /show tips for this step/i })[0]);
+    expect(startWizardProviderTourMock).toHaveBeenCalledTimes(1);
+
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.queryByRole("button", { name: /show tips for this step/i })).not.toBeInTheDocument();
   });
 });

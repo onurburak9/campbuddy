@@ -16,6 +16,7 @@ interface SearchSelectProps<T extends Item> {
   renderResult?: (item: T) => ReactNode;
   disabled?: boolean;
   placeholder?: string;
+  tourId?: string;
 }
 
 export function SearchSelect<T extends Item>({
@@ -26,6 +27,7 @@ export function SearchSelect<T extends Item>({
   renderResult,
   disabled,
   placeholder,
+  tourId,
 }: SearchSelectProps<T>) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<T[]>([]);
@@ -93,7 +95,7 @@ export function SearchSelect<T extends Item>({
   }
 
   return (
-    <div className="space-y-2" ref={containerRef}>
+    <div className="space-y-2" ref={containerRef} data-tour={tourId}>
       <div className="flex flex-wrap gap-1.5">
         {selected.map((item) => (
           <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-forest-100 px-2.5 py-1 text-sm text-forest-800 dark:bg-[#222] dark:text-[#EEE]">

@@ -82,9 +82,12 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
     <div className="space-y-4">
       <Input label="Scan name (optional)" value={state.name}
         onChange={(e) => set("name", e.target.value)} placeholder="Yosemite summer trip" />
-      <Select label="Provider" value={state.provider} onChange={(v) => set("provider", v)}
-        options={PROVIDERS.map((p) => ({ value: p, label: p, disabled: p !== "RecreationDotGov" }))} />
+      <div data-tour="provider-select">
+        <Select label="Provider" value={state.provider} onChange={(v) => set("provider", v)}
+          options={PROVIDERS.map((p) => ({ value: p, label: p, disabled: p !== "RecreationDotGov" }))} />
+      </div>
       <SearchSelect
+        tourId="search-recreation-areas"
         label="Recreation Areas"
         selected={resolvedRecAreaIds}
         onChange={(items) => set("recAreaIds", items)}
@@ -92,22 +95,24 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
         renderResult={(item) => <RecreationAreaResultRow item={item} />}
         placeholder="Search by name, e.g. Yosemite"
       />
-      <SearchSelect
-        label="Campgrounds (optional)"
-        selected={resolvedCampgroundIds}
-        onChange={(items) => set("campgroundIds", items)}
-        search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
-        renderResult={(item) => <CampgroundResultRow item={item} />}
-        placeholder="Search by name"
-      />
-      <SearchSelect
-        label="Campsites (optional)"
-        selected={resolvedCampsiteIds}
-        onChange={(items) => set("campsiteIds", items)}
-        search={() => (campgroundIds.length ? search.campsites(campgroundIds) : Promise.resolve([]))}
-        disabled={campgroundIds.length === 0}
-        placeholder={campgroundIds.length ? "Search by site name" : "Select a campground first"}
-      />
+      <div data-tour="narrow-campground-campsite" className="space-y-4">
+        <SearchSelect
+          label="Campgrounds (optional)"
+          selected={resolvedCampgroundIds}
+          onChange={(items) => set("campgroundIds", items)}
+          search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
+          renderResult={(item) => <CampgroundResultRow item={item} />}
+          placeholder="Search by name"
+        />
+        <SearchSelect
+          label="Campsites (optional)"
+          selected={resolvedCampsiteIds}
+          onChange={(items) => set("campsiteIds", items)}
+          search={() => (campgroundIds.length ? search.campsites(campgroundIds) : Promise.resolve([]))}
+          disabled={campgroundIds.length === 0}
+          placeholder={campgroundIds.length ? "Search by site name" : "Select a campground first"}
+        />
+      </div>
     </div>
   );
 }
