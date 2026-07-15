@@ -59,7 +59,7 @@ export function useScanFormState(scan?: Scan) {
     campground_ids: state.campgroundIds.length ? state.campgroundIds.map((i) => i.id) : null,
     campsite_ids: state.campsiteIds.length ? state.campsiteIds.map((i) => i.id) : null,
     search_windows: state.windows,
-    nights: state.nights,
+    nights: Math.max(1, state.nights),
     days_of_week: state.daysOfWeek.length ? state.daysOfWeek : null,
     weekends_only: state.weekendsOnly,
     notify_via_email: state.notifyEmail,

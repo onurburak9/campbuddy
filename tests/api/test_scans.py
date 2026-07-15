@@ -117,18 +117,18 @@ def test_get_scan_returns_404_for_missing(auth_client):
 def test_update_scan_changes_nights(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
-    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"nights": 4})
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"nights": 3})
     assert resp.status_code == 200
-    assert resp.json()["nights"] == 4
+    assert resp.json()["nights"] == 3
 
 
 def test_patch_scan_ignores_status_field(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
-    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"status": "paused", "nights": 5})
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"status": "paused", "nights": 3})
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
-    assert resp.json()["nights"] == 5
+    assert resp.json()["nights"] == 3
 
 
 def test_delete_scan_soft_deletes(auth_client):
@@ -290,6 +290,19 @@ def test_create_scan_autobook_without_creds_returns_422(auth_client):
         "search_windows": WINDOWS,
         "auto_book": True,
     })
+    assert resp.status_code == 422
+
+
+def test_create_scan_rejects_nights_longer_than_window(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "nights": 10})
+    assert resp.status_code == 422
+
+
+def test_update_scan_rejects_nights_longer_than_window(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"nights": 10})
     assert resp.status_code == 422
 
 

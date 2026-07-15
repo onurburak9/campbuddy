@@ -52,6 +52,14 @@ const DAYS = [
   { i: 3, label: "Thu" }, { i: 4, label: "Fri" }, { i: 5, label: "Sat" }, { i: 6, label: "Sun" },
 ];
 
+export function windowNights(w: SearchWindow): number | null {
+  if (!w.start_date || !w.end_date) return null;
+  const diffDays = Math.round(
+    (new Date(w.end_date).getTime() - new Date(w.start_date).getTime()) / 86_400_000,
+  );
+  return diffDays > 0 ? diffDays : null;
+}
+
 const POLLING_OPTIONS = [
   { value: "300", label: "5 min" },
   { value: "900", label: "15 min" },
@@ -143,6 +151,12 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
         : [...state.daysOfWeek, d],
     );
 
+  const windowNightCounts = state.windows
+    .map((w) => windowNights(w))
+    .filter((n): n is number => n !== null);
+  const shortestWindowNights = windowNightCounts.length ? Math.min(...windowNightCounts) : null;
+  const nightsExceedWindow = shortestWindowNights !== null && state.nights > shortestWindowNights;
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -162,8 +176,25 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
           + Add window
         </Button>
       </div>
-      <Input label="Consecutive nights" type="number" min={1} value={state.nights}
-        onChange={(e) => set("nights", Math.max(1, Number(e.target.value) || 1))} />
+      <Input
+        label="Consecutive nights"
+        type="number"
+        min={1}
+        value={state.nights === 0 ? "" : state.nights}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === "") { set("nights", 0); return; }
+          const parsed = Number(raw);
+          if (Number.isNaN(parsed)) return;
+          set("nights", Math.max(1, parsed));
+        }}
+        onBlur={() => { if (state.nights === 0) set("nights", 1); }}
+      />
+      {nightsExceedWindow && (
+        <p className="text-sm text-[#DC2626]">
+          Consecutive nights ({state.nights}) can't be longer than the shortest search window ({shortestWindowNights} night{shortestWindowNights === 1 ? "" : "s"}).
+        </p>
+      )}
       <div>
         <span className="mb-1 block text-sm text-stone-600 dark:text-[#888]">Days of week</span>
         <div className="flex flex-wrap gap-1.5">

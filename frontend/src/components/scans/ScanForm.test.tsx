@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { NotificationsFields, ProviderSitesFields } from "./ScanForm";
+import { NotificationsFields, ProviderSitesFields, DatesFiltersFields } from "./ScanForm";
 import { PROVIDERS } from "../../types";
 import type { ScanFormState } from "./useScanFormState";
 
@@ -87,6 +89,62 @@ describe("ProviderSitesFields — id resolution", () => {
     render(wrapWithQueryClient(<ProviderSitesFields state={state} set={() => {}} />));
     expect(screen.getByText("ID 2991")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+  });
+});
+
+function ControlledDatesFilters({ initial }: { initial: Partial<ScanFormState> }) {
+  const [state, setState] = useState<ScanFormState>({ ...makeState(300), ...initial });
+  const set = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) =>
+    setState((prev) => ({ ...prev, [key]: value }));
+  return <DatesFiltersFields state={state} set={set} />;
+}
+
+describe("DatesFiltersFields — consecutive nights input", () => {
+  it("allows clearing the field to empty instead of snapping back to 1 on every keystroke", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{ nights: 3 }} />);
+    const input = screen.getByLabelText("Consecutive nights") as HTMLInputElement;
+
+    await user.clear(input);
+
+    expect(input.value).toBe("");
+  });
+
+  it("resets an empty field back to 1 on blur", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{ nights: 3 }} />);
+    const input = screen.getByLabelText("Consecutive nights") as HTMLInputElement;
+
+    await user.clear(input);
+    await user.tab();
+
+    expect(input.value).toBe("1");
+  });
+
+  it("shows a validation message when nights exceeds the shortest search window", () => {
+    render(
+      <ControlledDatesFilters
+        initial={{
+          nights: 5,
+          windows: [{ start_date: "2026-07-03", end_date: "2026-07-06" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/can't be longer than the shortest search window/i)).toBeInTheDocument();
+  });
+
+  it("does not show a validation message when nights fits within the window", () => {
+    render(
+      <ControlledDatesFilters
+        initial={{
+          nights: 3,
+          windows: [{ start_date: "2026-07-03", end_date: "2026-07-06" }],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/can't be longer than the shortest search window/i)).not.toBeInTheDocument();
   });
 });
 
