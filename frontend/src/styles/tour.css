@@ -1,0 +1,84 @@
+.driver-popover {
+  background-color: #ffffff;
+  color: #1c1917;
+  border-radius: 0.5rem;
+  border: 1px solid #DFDCD9;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+.driver-popover-title {
+  color: #1c1917;
+}
+
+.driver-popover-description {
+  color: #57534e;
+}
+
+.driver-popover-progress-text {
+  color: #78716c;
+}
+
+.driver-popover-footer-btn.driver-popover-next-btn,
+.driver-popover-footer-btn.driver-popover-done-btn {
+  background-color: #2E6F40;
+  border-color: #2E6F40;
+  color: #ffffff;
+}
+
+.driver-popover-footer-btn.driver-popover-next-btn:hover,
+.driver-popover-footer-btn.driver-popover-done-btn:hover {
+  background-color: #235732;
+  border-color: #235732;
+}
+
+.driver-popover-close-btn {
+  color: #a8a29e;
+}
+
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  color: #1c1917;
+}
+
+.dark .driver-popover {
+  background-color: #1A1A1A;
+  color: #EEEEEE;
+  border-color: #222222;
+}
+
+.dark .driver-popover-title {
+  color: #EEEEEE;
+}
+
+.dark .driver-popover-description {
+  color: #AAAAAA;
+}
+
+.dark .driver-popover-progress-text {
+  color: #888888;
+}
+
+.dark .driver-popover-footer-btn {
+  background-color: #222222;
+  border-color: #333333;
+  color: #EEEEEE;
+}
+
+.dark .driver-popover-footer-btn.driver-popover-next-btn,
+.dark .driver-popover-footer-btn.driver-popover-done-btn {
+  background-color: #2E6F40;
+  border-color: #2E6F40;
+  color: #ffffff;
+}
+
+.dark .driver-popover-close-btn {
+  color: #888888;
+}
+
+/* Arrow color follows the popover background per side — see driver.js's own
+   driver-popover-arrow-side-* rules, which each leave exactly one border
+   side at its default color and zero out the other three. */
+.dark .driver-popover-arrow-side-left { border-left-color: #1A1A1A; }
+.dark .driver-popover-arrow-side-right { border-right-color: #1A1A1A; }
+.dark .driver-popover-arrow-side-top { border-top-color: #1A1A1A; }
+.dark .driver-popover-arrow-side-bottom { border-bottom-color: #1A1A1A; }
