@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from db.models import Scan, ScanStatus, User
 from core.services.exceptions import NotFound, Forbidden, LimitExceeded, InvalidState, ValidationFailed
 
@@ -19,6 +19,18 @@ def _require_creds_for_autobook(user, enabled: bool) -> None:
     if enabled and not (user.recreationgov_email and user.recreationgov_password):
         raise ValidationFailed(
             "auto_book requires Recreation.gov email and password on your profile"
+        )
+
+
+def _require_nights_fit_windows(nights: int, windows: list) -> None:
+    spans = [
+        (date.fromisoformat(str(w["end_date"])) - date.fromisoformat(str(w["start_date"]))).days
+        for w in windows
+    ]
+    shortest = min(spans, default=None)
+    if shortest is not None and nights > shortest:
+        raise ValidationFailed(
+            f"nights ({nights}) cannot exceed the shortest search window ({shortest} nights)"
         )
 
 
@@ -52,6 +64,7 @@ def create_scan(db, user_id: int, data: dict) -> Scan:
     if active_count >= user.scan_limit:
         raise LimitExceeded(f"Scan limit of {user.scan_limit} reached")
     _require_creds_for_autobook(user, bool(data.get("auto_book", False)))
+    _require_nights_fit_windows(data.get("nights", 1), data["search_windows"])
     scan = Scan(user_id=user_id, **data)
     db.add(scan)
     db.flush()
@@ -62,6 +75,10 @@ def update_scan(db, scan_id: int, user_id: int, data: dict) -> Scan:
     scan = get_scan(db, scan_id, user_id)
     effective_auto_book = data.get("auto_book", scan.auto_book)
     _require_creds_for_autobook(scan.user, bool(effective_auto_book))
+    if "nights" in data or "search_windows" in data:
+        effective_nights = data.get("nights", scan.nights)
+        effective_windows = data.get("search_windows", scan.search_windows)
+        _require_nights_fit_windows(effective_nights, effective_windows)
     for key, value in data.items():
         if key not in _UPDATABLE:
             continue
