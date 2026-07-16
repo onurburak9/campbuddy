@@ -21,7 +21,7 @@ def mock_provider(mocker):
 
 
 def test_search_recreation_areas_uses_assets_search(mocker, mock_provider):
-    mocker.patch("core.services.search.search_assets", return_value=[
+    assets_mock = mocker.patch("core.services.search.search_assets", return_value=[
         {"id": "2991", "name": "Yosemite National Park", "type": "Rec Area"},
     ])
     resolve_mock = mocker.patch(
@@ -29,6 +29,7 @@ def test_search_recreation_areas_uses_assets_search(mocker, mock_provider):
         return_value=[{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}],
     )
     results = search.search_recreation_areas("Yosemite")
+    assets_mock.assert_called_once_with("Yosemite", "recarea")
     resolve_mock.assert_called_once_with([2991])
     assert results == [{"id": 2991, "name": "Yosemite National Park", "state": "CA", "type": "National Park Service"}]
 
@@ -111,7 +112,7 @@ def make_facility(**overrides):
 
 
 def test_search_campgrounds_filters_to_campground_type(mocker, mock_provider):
-    mocker.patch("core.services.search.search_assets", return_value=[
+    assets_mock = mocker.patch("core.services.search.search_assets", return_value=[
         {"id": "232447", "name": "Upper Pines Campground", "type": "Campground"},
         {"id": "245093", "name": "Boardstand /Military Road", "type": "Facility"},
     ])
@@ -123,11 +124,23 @@ def test_search_campgrounds_filters_to_campground_type(mocker, mock_provider):
         }],
     )
     results = search.search_campgrounds("Upper Pines", None)
+    assets_mock.assert_called_once_with("Upper Pines", "facility")
     resolve_mock.assert_called_once_with([232447])
     assert results == [{
         "id": 232447, "name": "Upper Pines",
         "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
     }]
+
+
+def test_search_campgrounds_with_empty_rec_area_ids_uses_assets_search(mocker, mock_provider):
+    assets_mock = mocker.patch("core.services.search.search_assets", return_value=[
+        {"id": "232447", "name": "Upper Pines Campground", "type": "Campground"},
+    ])
+    resolve_mock = mocker.patch("core.services.search.resolve_campgrounds", return_value=[])
+    search.search_campgrounds(None, [])
+    assets_mock.assert_called_once_with(None, "facility")
+    resolve_mock.assert_called_once_with([232447])
+    mock_provider.find_campgrounds.assert_not_called()
 
 
 def test_search_campgrounds_by_rec_area_ignores_query(mock_provider):

@@ -1,8 +1,4 @@
-import logging
-
 import httpx
-
-logger = logging.getLogger(__name__)
 
 ASSETS_URL = "https://ridb.recreation.gov/api/v1/public/assets"
 
@@ -11,7 +7,7 @@ class AssetsSearchError(Exception):
     pass
 
 
-def search_assets(terms: str, asset_type: str, limit: int = 15, timeout: float = 5.0) -> list:
+def search_assets(terms: str, asset_type: str, limit: int = 15, timeout: float = 5.0) -> list[dict]:
     try:
         resp = httpx.get(
             ASSETS_URL,

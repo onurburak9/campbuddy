@@ -48,7 +48,10 @@ def search_recreation_areas(query: str) -> list:
     except AssetsSearchError as e:
         logger.warning("RIDB assets search unavailable (%s), falling back to recareas query search", e)
         return _search_recreation_areas_fallback(query)
-    return resolve_recreation_areas(_extract_asset_ids(assets))
+    asset_ids = _extract_asset_ids(assets)
+    if assets and not asset_ids:
+        logger.warning("RIDB assets search returned %d item(s) but none had extractable ids for query %r", len(assets), query)
+    return resolve_recreation_areas(asset_ids)
 
 
 def _search_recreation_areas_fallback(query: str) -> list:
@@ -104,7 +107,10 @@ def _search_campgrounds_cached(query, rec_area_ids):
     except AssetsSearchError as e:
         logger.warning("RIDB assets search unavailable (%s), falling back to facilities query search", e)
         return _search_campgrounds_fallback(query)
-    return resolve_campgrounds(_extract_asset_ids(assets, expected_type="Campground"))
+    asset_ids = _extract_asset_ids(assets, expected_type="Campground")
+    if assets and not asset_ids:
+        logger.warning("RIDB assets search returned %d item(s) but none had extractable Campground ids for query %r", len(assets), query)
+    return resolve_campgrounds(asset_ids)
 
 
 def _search_campgrounds_by_rec_area(rec_area_ids) -> list:
