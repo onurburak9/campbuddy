@@ -97,12 +97,29 @@ def search_campgrounds(query: Optional[str], rec_area_ids: Optional[list] = None
 
 @lru_cache(maxsize=128)
 def _search_campgrounds_cached(query, rec_area_ids):
+    if rec_area_ids:
+        return _search_campgrounds_by_rec_area(rec_area_ids)
+    try:
+        assets = search_assets(query, "facility")
+    except AssetsSearchError as e:
+        logger.warning("RIDB assets search unavailable (%s), falling back to facilities query search", e)
+        return _search_campgrounds_fallback(query)
+    return resolve_campgrounds(_extract_asset_ids(assets, expected_type="Campground"))
+
+
+def _search_campgrounds_by_rec_area(rec_area_ids) -> list:
     provider = _get_provider()
     try:
-        if rec_area_ids:
-            facilities = provider.find_campgrounds(rec_area_id=list(rec_area_ids))
-        else:
-            facilities = provider.find_campgrounds(search_string=query)
+        facilities = provider.find_campgrounds(rec_area_id=list(rec_area_ids))
+    except Exception as e:
+        raise UpstreamError(str(e)) from e
+    return [_normalize_campground(f) for f in facilities]
+
+
+def _search_campgrounds_fallback(query) -> list:
+    provider = _get_provider()
+    try:
+        facilities = provider.find_campgrounds(search_string=query)
     except Exception as e:
         raise UpstreamError(str(e)) from e
     return [_normalize_campground(f) for f in facilities]

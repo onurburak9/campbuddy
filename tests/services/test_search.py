@@ -110,14 +110,24 @@ def make_facility(**overrides):
     return facility
 
 
-def test_search_campgrounds_by_query(mock_provider):
-    mock_provider.find_campgrounds.return_value = [make_facility()]
+def test_search_campgrounds_filters_to_campground_type(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", return_value=[
+        {"id": "232447", "name": "Upper Pines Campground", "type": "Campground"},
+        {"id": "245093", "name": "Boardstand /Military Road", "type": "Facility"},
+    ])
+    resolve_mock = mocker.patch(
+        "core.services.search.resolve_campgrounds",
+        return_value=[{
+            "id": 232447, "name": "Upper Pines",
+            "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
+        }],
+    )
     results = search.search_campgrounds("Upper Pines", None)
+    resolve_mock.assert_called_once_with([232447])
     assert results == [{
         "id": 232447, "name": "Upper Pines",
         "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
     }]
-    mock_provider.find_campgrounds.assert_called_once_with(search_string="Upper Pines")
 
 
 def test_search_campgrounds_by_rec_area_ignores_query(mock_provider):
@@ -133,7 +143,19 @@ def test_search_campgrounds_caches_by_query_and_rec_area_ids(mock_provider):
     assert mock_provider.find_campgrounds.call_count == 1
 
 
-def test_search_campgrounds_wraps_upstream_failure(mock_provider):
+def test_search_campgrounds_falls_back_when_assets_unavailable(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", side_effect=AssetsSearchError("down"))
+    mock_provider.find_campgrounds.return_value = [make_facility()]
+    results = search.search_campgrounds("Upper Pines", None)
+    assert results == [{
+        "id": 232447, "name": "Upper Pines",
+        "recreation_area": "Yosemite National Park", "recreation_area_id": 2991,
+    }]
+    mock_provider.find_campgrounds.assert_called_once_with(search_string="Upper Pines")
+
+
+def test_search_campgrounds_fallback_wraps_upstream_failure(mocker, mock_provider):
+    mocker.patch("core.services.search.search_assets", side_effect=AssetsSearchError("down"))
     mock_provider.find_campgrounds.side_effect = ConnectionError("RIDB is down")
     with pytest.raises(UpstreamError):
         search.search_campgrounds("fail-query", None)
