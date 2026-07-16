@@ -94,6 +94,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
         search={(q) => search.recreationAreas(q)}
         renderResult={(item) => <RecreationAreaResultRow item={item} />}
         placeholder="Search by name, e.g. Yosemite"
+        idHint="Find this in the recreation.gov URL, e.g. https://www.recreation.gov/gateways/1076 → ID is 1076"
       />
       <div data-tour="narrow-campground-campsite" className="space-y-4">
         <SearchSelect
@@ -103,6 +104,8 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
           search={(q) => search.campgrounds(q, recAreaIds.length ? recAreaIds : null)}
           renderResult={(item) => <CampgroundResultRow item={item} />}
           placeholder="Search by name"
+          hint={recAreaIds.length ? "A Recreation Area is selected above, so this lists all its campgrounds — typing here doesn't filter them yet." : undefined}
+          idHint="Find this in the recreation.gov URL, e.g. https://www.recreation.gov/camping/campgrounds/274314 → ID is 274314"
         />
         <SearchSelect
           label="Campsites (optional)"
@@ -111,6 +114,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
           search={() => (campgroundIds.length ? search.campsites(campgroundIds) : Promise.resolve([]))}
           disabled={campgroundIds.length === 0}
           placeholder={campgroundIds.length ? "Search by site name" : "Select a campground first"}
+          idHint="Find this in the recreation.gov URL, e.g. https://www.recreation.gov/camping/campsites/105081 → ID is 105081"
         />
       </div>
     </div>

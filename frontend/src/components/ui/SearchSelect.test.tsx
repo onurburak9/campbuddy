@@ -104,4 +104,30 @@ describe("SearchSelect", () => {
     await userEvent.type(input, "s");
     await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
   });
+
+  it("shows a hint icon next to the search label when hint is given", () => {
+    render(
+      <SearchSelect
+        label="Campgrounds"
+        selected={[]}
+        onChange={vi.fn()}
+        search={vi.fn().mockResolvedValue([])}
+        hint="This lists all campgrounds in the selected area."
+      />
+    );
+    expect(screen.getByTitle("This lists all campgrounds in the selected area.")).toBeInTheDocument();
+  });
+
+  it("shows a hint icon next to the Add by ID label when idHint is given", () => {
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[]}
+        onChange={vi.fn()}
+        search={vi.fn().mockResolvedValue([])}
+        idHint="Find this in the recreation.gov URL"
+      />
+    );
+    expect(screen.getByTitle("Find this in the recreation.gov URL")).toBeInTheDocument();
+  });
 });
