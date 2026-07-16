@@ -4,12 +4,25 @@ import { cn } from "../../lib/cn";
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
 }
 
-export function Input({ label, error, className, id, ...rest }: Props) {
+export function Input({ label, error, hint, className, id, ...rest }: Props) {
   return (
     <label className="block">
-      {label && <span className="mb-1 block text-sm text-stone-600 dark:text-[#888]">{label}</span>}
+      {label && (
+        <span className="mb-1 flex items-center gap-1 text-sm text-stone-600 dark:text-[#888]">
+          {label}
+          {hint && (
+            <span
+              title={hint}
+              className="inline-flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full border border-stone-400 text-[10px] leading-none text-stone-500 dark:border-[#555] dark:text-[#888]"
+            >
+              i
+            </span>
+          )}
+        </span>
+      )}
       <input
         id={id}
         className={cn(

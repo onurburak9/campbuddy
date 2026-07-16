@@ -17,6 +17,8 @@ interface SearchSelectProps<T extends Item> {
   disabled?: boolean;
   placeholder?: string;
   tourId?: string;
+  hint?: string;
+  idHint?: string;
 }
 
 export function SearchSelect<T extends Item>({
@@ -28,6 +30,8 @@ export function SearchSelect<T extends Item>({
   disabled,
   placeholder,
   tourId,
+  hint,
+  idHint,
 }: SearchSelectProps<T>) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<T[]>([]);
@@ -108,6 +112,7 @@ export function SearchSelect<T extends Item>({
       </div>
       <Input
         label={label}
+        hint={hint}
         value={query}
         disabled={disabled}
         placeholder={placeholder}
@@ -143,6 +148,7 @@ export function SearchSelect<T extends Item>({
       <div className="flex items-end gap-2">
         <Input
           label="Add by ID"
+          hint={idHint}
           value={addById}
           onChange={(e) => setAddById(e.target.value)}
           placeholder="e.g. 1074"
