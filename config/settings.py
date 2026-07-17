@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     ridb_api_key: str = ""
     registration_enabled: bool = True
+    app_base_url: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"
