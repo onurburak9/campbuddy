@@ -91,7 +91,7 @@ def test_registration_enabled_can_be_disabled(env):
 
 def test_app_base_url_defaults_to_localhost(env):
     s = Settings(_env_file=None)
-    assert s.app_base_url == "http://localhost:5173"
+    assert s.app_base_url == "http://localhost:3000"
 
 
 def test_app_base_url_can_be_overridden(env):

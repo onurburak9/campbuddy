@@ -215,7 +215,7 @@ def test_forgot_password_reset_url_contains_token_and_base_url(client, user_in_d
     client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
     to, reset_url, _settings = mock_send.call_args[0]
     assert to == "user@example.com"
-    assert reset_url.startswith("http://localhost:5173/reset-password?token=")
+    assert reset_url.startswith("http://localhost:3000/reset-password?token=")
 
 
 def test_forgot_password_malformed_email_returns_422(client):
