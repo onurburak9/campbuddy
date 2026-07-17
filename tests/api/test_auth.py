@@ -5,6 +5,7 @@ import api.database as api_db
 from db.session import get_db
 from api.auth import hash_password, COOKIE_NAME, ALGORITHM
 from jose import jwt
+from core.services.users import create_password_reset_token
 
 
 def test_login_sets_cookie(client, user_in_db):
@@ -227,3 +228,41 @@ def test_forgot_password_email_send_failure_still_returns_ok(client, user_in_db,
     resp = client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
     assert resp.status_code == 200
     assert resp.json() == {"ok": True}
+
+
+def test_reset_password_sets_cookie_and_updates_password(client, user_in_db):
+    with get_db(api_db.get_factory()) as db:
+        token = create_password_reset_token(db, "user@example.com")
+    resp = client.post("/api/v1/auth/reset-password", json={"token": token, "password": "newlongpassword"})
+    assert resp.status_code == 200
+    assert "campbuddy_session" in resp.cookies
+    login_resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "newlongpassword"})
+    assert login_resp.status_code == 200
+
+
+def test_reset_password_old_password_no_longer_works(client, user_in_db):
+    with get_db(api_db.get_factory()) as db:
+        token = create_password_reset_token(db, "user@example.com")
+    client.post("/api/v1/auth/reset-password", json={"token": token, "password": "newlongpassword"})
+    resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+    assert resp.status_code == 401
+
+
+def test_reset_password_invalid_token_returns_400(client):
+    resp = client.post("/api/v1/auth/reset-password", json={"token": "bogus", "password": "newlongpassword"})
+    assert resp.status_code == 400
+
+
+def test_reset_password_reused_token_returns_400(client, user_in_db):
+    with get_db(api_db.get_factory()) as db:
+        token = create_password_reset_token(db, "user@example.com")
+    client.post("/api/v1/auth/reset-password", json={"token": token, "password": "firstnewpw"})
+    resp = client.post("/api/v1/auth/reset-password", json={"token": token, "password": "secondnewpw"})
+    assert resp.status_code == 400
+
+
+def test_reset_password_short_password_returns_422(client, user_in_db):
+    with get_db(api_db.get_factory()) as db:
+        token = create_password_reset_token(db, "user@example.com")
+    resp = client.post("/api/v1/auth/reset-password", json={"token": token, "password": "short"})
+    assert resp.status_code == 422

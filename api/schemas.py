@@ -55,6 +55,11 @@ class ForgotPasswordRequest(BaseModel):
         return v
 
 
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+
+
 class MeResponse(BaseModel):
     id: int
     email: str
