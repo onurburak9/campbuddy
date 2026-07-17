@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from db.models import User
+from db.models import User, PasswordResetToken
 import api.database as api_db
 from db.session import get_db
 from api.auth import hash_password, COOKIE_NAME, ALGORITHM
@@ -182,3 +182,48 @@ def test_register_disabled_returns_403(client, monkeypatch):
         assert resp.status_code == 403
     finally:
         get_settings.cache_clear()
+
+
+def test_forgot_password_returns_ok_for_known_email(client, user_in_db, mocker):
+    mock_send = mocker.patch("api.routes.auth.send_password_reset_email")
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    mock_send.assert_called_once()
+
+
+def test_forgot_password_returns_ok_for_unknown_email_without_sending(client, mocker):
+    mock_send = mocker.patch("api.routes.auth.send_password_reset_email")
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "ghost@example.com"})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    mock_send.assert_not_called()
+
+
+def test_forgot_password_creates_reset_token_for_known_email(client, user_in_db, mocker):
+    mocker.patch("api.routes.auth.send_password_reset_email")
+    client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+    with get_db(api_db.get_factory()) as db:
+        token = db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_in_db["id"]).first()
+        assert token is not None
+        assert token.used_at is None
+
+
+def test_forgot_password_reset_url_contains_token_and_base_url(client, user_in_db, mocker):
+    mock_send = mocker.patch("api.routes.auth.send_password_reset_email")
+    client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+    to, reset_url, _settings = mock_send.call_args[0]
+    assert to == "user@example.com"
+    assert reset_url.startswith("http://localhost:5173/reset-password?token=")
+
+
+def test_forgot_password_malformed_email_returns_422(client):
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "not-an-email"})
+    assert resp.status_code == 422
+
+
+def test_forgot_password_email_send_failure_still_returns_ok(client, user_in_db, mocker):
+    mocker.patch("api.routes.auth.send_password_reset_email", side_effect=Exception("smtp down"))
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
