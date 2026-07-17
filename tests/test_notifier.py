@@ -12,6 +12,7 @@ from core.notifier import (
     notify_cart_results,
     send_email,
     send_email_digest,
+    send_password_reset_email,
     send_telegram,
     send_telegram_digest,
 )
@@ -59,6 +60,27 @@ def test_email_contains_booking_url_and_cart_status(mocker):
     body = _decode_email_body(instance.sendmail.call_args[0][2])
     assert "https://www.recreation.gov/camping/campsites/10357088" in body
     assert "Added to cart" in body
+
+
+def test_password_reset_email_contains_reset_url(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_password_reset_email(
+        "to@example.com", "https://app.example.com/reset-password?token=abc123", make_settings()
+    )
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "https://app.example.com/reset-password?token=abc123" in body
+
+
+def test_password_reset_email_sent_to_correct_recipient(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_password_reset_email(
+        "to@example.com", "https://app.example.com/reset-password?token=abc123", make_settings()
+    )
+    from_addr, to_addr, _ = instance.sendmail.call_args[0]
+    assert from_addr == "CampBuddy <from@example.com>"
+    assert to_addr == "to@example.com"
 
 
 def test_email_fallback_message_when_cart_failed(mocker):
