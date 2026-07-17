@@ -2,7 +2,7 @@ import pytest
 import hashlib
 from datetime import datetime, timezone, timedelta
 from db.models import User, Scan, PasswordResetToken
-from core.services.users import get_user_by_email, update_profile, scans_used, register_user, create_password_reset_token
+from core.services.users import get_user_by_email, update_profile, scans_used, register_user, create_password_reset_token, reset_password_with_token
 from core.services import scans as scans_svc
 from core.services.exceptions import NotFound, InvalidState
 from core.crypto import encrypt_password
@@ -166,3 +166,49 @@ def test_create_password_reset_token_returns_none_for_soft_deleted_user(db):
     u.deleted_at = datetime.now(timezone.utc)
     db.flush()
     assert create_password_reset_token(db, "gone@e.com") is None
+
+
+def test_reset_password_with_token_updates_password_and_marks_used(db):
+    make_user(db, "reset@e.com")
+    token = create_password_reset_token(db, "reset@e.com")
+    user = reset_password_with_token(db, token, "new-hashed-value")
+    assert user.hashed_password == "new-hashed-value"
+    row = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == hashlib.sha256(token.encode()).hexdigest()
+    ).first()
+    assert row.used_at is not None
+
+
+def test_reset_password_with_token_raises_not_found_for_unknown_token(db):
+    with pytest.raises(NotFound):
+        reset_password_with_token(db, "not-a-real-token", "hashed")
+
+
+def test_reset_password_with_token_raises_not_found_for_expired_token(db):
+    u = make_user(db, "reset@e.com")
+    token = PasswordResetToken(
+        user_id=u.id,
+        token_hash=hashlib.sha256("expired-token".encode()).hexdigest(),
+        expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+    )
+    db.add(token)
+    db.flush()
+    with pytest.raises(NotFound):
+        reset_password_with_token(db, "expired-token", "hashed")
+
+
+def test_reset_password_with_token_raises_not_found_for_already_used_token(db):
+    make_user(db, "reset@e.com")
+    token = create_password_reset_token(db, "reset@e.com")
+    reset_password_with_token(db, token, "hashed-1")
+    with pytest.raises(NotFound):
+        reset_password_with_token(db, token, "hashed-2")
+
+
+def test_reset_password_with_token_raises_not_found_for_soft_deleted_user(db):
+    u = make_user(db, "reset@e.com")
+    token = create_password_reset_token(db, "reset@e.com")
+    u.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    with pytest.raises(NotFound):
+        reset_password_with_token(db, token, "hashed")

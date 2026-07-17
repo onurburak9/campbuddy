@@ -68,3 +68,21 @@ def create_password_reset_token(db, email: str) -> Optional[str]:
     db.add(token)
     db.flush()
     return raw_token
+
+
+def reset_password_with_token(db, raw_token: str, hashed_password: str) -> User:
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used_at.is_(None),
+        PasswordResetToken.expires_at > datetime.now(timezone.utc),
+    ).first()
+    if not token:
+        raise NotFound("Invalid or expired reset link")
+    user = db.query(User).filter(User.id == token.user_id, User.deleted_at.is_(None)).first()
+    if not user:
+        raise NotFound("Invalid or expired reset link")
+    token.used_at = datetime.now(timezone.utc)
+    user.hashed_password = hashed_password
+    db.flush()
+    return user
