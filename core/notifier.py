@@ -52,6 +52,24 @@ def send_email(to: str, payload: NotificationPayload, settings) -> None:
     logger.info("Email sent to %s", to)
 
 
+def send_password_reset_email(to: str, reset_url: str, settings) -> None:
+    body = (
+        "A password reset was requested for your CampBuddy account.\n\n"
+        f"Reset your password: {reset_url}\n\n"
+        "This link expires in 30 minutes. If you didn't request this, ignore this email.\n"
+    )
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["From"] = settings.smtp_from
+    msg["To"] = to
+    msg["Subject"] = "Reset your CampBuddy password"
+
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        server.starttls()
+        server.login(settings.smtp_user, settings.smtp_password)
+        server.sendmail(settings.smtp_from, to, msg.as_string())
+    logger.info("Password reset email sent to %s", to)
+
+
 def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:
     if not settings.telegram_bot_token:
         logger.warning("Telegram token not set, skipping")

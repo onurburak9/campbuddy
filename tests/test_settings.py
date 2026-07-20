@@ -87,3 +87,14 @@ def test_registration_enabled_can_be_disabled(env):
     env.setenv("REGISTRATION_ENABLED", "false")
     s = Settings(_env_file=None)
     assert s.registration_enabled is False
+
+
+def test_app_base_url_defaults_to_localhost(env):
+    s = Settings(_env_file=None)
+    assert s.app_base_url == "http://localhost:3000"
+
+
+def test_app_base_url_can_be_overridden(env):
+    env.setenv("APP_BASE_URL", "https://campbuddy.example.com")
+    s = Settings(_env_file=None)
+    assert s.app_base_url == "https://campbuddy.example.com"

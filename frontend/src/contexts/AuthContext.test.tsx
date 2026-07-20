@@ -79,4 +79,35 @@ describe("AuthContext", () => {
     await userEvent.click(screen.getByText("register"));
     await waitFor(() => expect(screen.getByText("in")).toBeInTheDocument());
   });
+
+  it("resets password and authenticates", async () => {
+    let reset = false;
+    server.use(
+      http.get("/api/v1/auth/me", () =>
+        reset
+          ? HttpResponse.json({ id: 3, email: "reset@e.com", scan_limit: 5, scans_used: 0 })
+          : new HttpResponse(null, { status: 401 })
+      ),
+      http.post("/api/v1/auth/reset-password", () => { reset = true; return HttpResponse.json(undefined); })
+    );
+    function ResetProbe() {
+      const { isAuthenticated, isLoading, resetPassword } = useAuth();
+      if (isLoading) return <span>loading</span>;
+      return (
+        <div>
+          <span>{isAuthenticated ? "in" : "out"}</span>
+          <button onClick={() => resetPassword("sometoken", "newlongpassword")}>reset</button>
+        </div>
+      );
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AuthProvider><ResetProbe /></AuthProvider>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(screen.getByText("out")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("reset"));
+    await waitFor(() => expect(screen.getByText("in")).toBeInTheDocument());
+  });
 });

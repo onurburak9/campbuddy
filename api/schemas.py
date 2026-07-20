@@ -45,6 +45,21 @@ class RegisterRequest(BaseModel):
         return v
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., min_length=3)
+
+    @validator("email")
+    def valid_email_format(cls, v):
+        if not _EMAIL_RE.fullmatch(v):
+            raise ValueError("Invalid email format")
+        return v
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=8)
+
+
 class MeResponse(BaseModel):
     id: int
     email: str

@@ -38,6 +38,9 @@ export function LoginForm() {
         value={email} onChange={(e) => setEmail(e.target.value)} required />
       <Input id="password" label="Password" type="password" autoComplete="current-password"
         value={password} onChange={(e) => setPassword(e.target.value)} required />
+      <div className="text-right">
+        <Link to="/forgot-password" className="text-sm text-forest-600 hover:underline">Forgot password?</Link>
+      </div>
       {error && <p className="text-sm text-[#DC2626]">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">
         {busy ? "Signing in…" : "Sign In"}

@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from api.auth import verify_password, hash_password, COOKIE_NAME, issue_session_cookie
 from api.deps import get_db_dep, get_current_user
-from api.schemas import LoginRequest, RegisterRequest, MeResponse
+from api.schemas import LoginRequest, RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest, MeResponse
 from config.settings import get_settings
-from core.services.users import get_user_by_email, register_user, scans_used
+from core.services.users import get_user_by_email, register_user, scans_used, create_password_reset_token, reset_password_with_token
 from core.services.exceptions import NotFound, InvalidState
+from core.notifier import send_password_reset_email
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,30 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
         user = register_user(db, body.email, hash_password(body.password))
     except InvalidState:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
+    issue_session_cookie(response, user.id, settings)
+    return {"ok": True}
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db_dep)):
+    settings = get_settings()
+    raw_token = create_password_reset_token(db, body.email)
+    if raw_token:
+        reset_url = f"{settings.app_base_url}/reset-password?token={raw_token}"
+        try:
+            send_password_reset_email(body.email, reset_url, settings)
+        except Exception as e:
+            logger.error("Password reset email failed: %s", e)
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordRequest, response: Response, db: Session = Depends(get_db_dep)):
+    settings = get_settings()
+    try:
+        user = reset_password_with_token(db, body.token, hash_password(body.password))
+    except NotFound:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link")
     issue_session_cookie(response, user.id, settings)
     return {"ok": True}
 
