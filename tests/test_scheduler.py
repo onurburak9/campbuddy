@@ -75,3 +75,41 @@ def test_sync_removes_stale_job(factory):
     scheduler.get_jobs.return_value = [stale_job]
     sync_jobs(scheduler, factory, MagicMock())
     scheduler.remove_job.assert_called_once_with("scan_9999")
+
+
+def test_sync_sets_immediate_next_run_time_for_never_run_scan(factory):
+    scan_id = add_scan(factory, status="active", interval=300)
+    scheduler = MagicMock()
+    scheduler.get_jobs.return_value = []
+    sync_jobs(scheduler, factory, MagicMock())
+    kwargs = scheduler.add_job.call_args[1]
+    assert kwargs["id"] == f"scan_{scan_id}"
+    assert "next_run_time" in kwargs
+    assert kwargs["next_run_time"] is not None
+
+
+def test_sync_does_not_set_next_run_time_for_scan_with_run_history(factory):
+    from datetime import datetime, timezone
+    from db.models import ScanRun, ScanOutcome
+    scan_id = add_scan(factory, status="active", interval=300)
+    with factory() as db:
+        db.add(ScanRun(
+            scan_id=scan_id, started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc), outcome=ScanOutcome.success, sites_found=0,
+        ))
+        db.commit()
+    scheduler = MagicMock()
+    scheduler.get_jobs.return_value = []
+    sync_jobs(scheduler, factory, MagicMock())
+    kwargs = scheduler.add_job.call_args[1]
+    assert "next_run_time" not in kwargs
+
+
+def test_start_scheduler_syncs_every_30_seconds(factory):
+    from core.scheduler import start_scheduler
+    scheduler = start_scheduler(factory, MagicMock())
+    try:
+        job = scheduler.get_job("__sync_jobs__")
+        assert job.trigger.interval.total_seconds() == 30
+    finally:
+        scheduler.shutdown(wait=False)
