@@ -202,6 +202,8 @@ class ScanStatsResponse(BaseModel):
     in_cart: int
     total_runs: int
     success_rate: int
+    next_run_at: Optional[datetime]
+    last_run_duration_seconds: Optional[float]
 
     class Config:
         orm_mode = True
