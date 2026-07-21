@@ -78,7 +78,9 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
             result = ScanResult(
                 scan_run_id=run_id, scan_id=scan_id,
                 campsite_id=str(site.campsite_id),
-                facility_name=site.facility_name, site_name=site.campsite_site_name,
+                facility_id=str(site.facility_id), facility_name=site.facility_name,
+                recreation_area_id=str(site.recreation_area_id), recreation_area=site.recreation_area,
+                site_name=site.campsite_site_name,
                 campsite_type=site.campsite_type,
                 booking_date=booking_date, booking_end_date=booking_end_date,
                 booking_url=site.booking_url, first_seen_at=seen, last_seen_at=seen,
