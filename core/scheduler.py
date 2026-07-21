@@ -46,7 +46,8 @@ def sync_jobs(scheduler: BackgroundScheduler, session_factory, settings) -> None
             .all()
         }
 
-    existing_ids = {job.id for job in scheduler.get_jobs() if job.id.startswith("scan_")}
+    existing_jobs = {job.id: job for job in scheduler.get_jobs() if job.id.startswith("scan_")}
+    existing_ids = set(existing_jobs)
 
     for job_id in existing_ids - active_ids:
         scheduler.remove_job(job_id)
@@ -56,6 +57,15 @@ def sync_jobs(scheduler: BackgroundScheduler, session_factory, settings) -> None
         scan = active_map[job_id]
         never_run = scan.id not in scan_ids_with_runs
         _add_scan_job(scheduler, scan, session_factory, settings, immediate=never_run)
+
+    for job_id in active_ids & existing_ids:
+        scan = active_map[job_id]
+        job = existing_jobs[job_id]
+        if job.trigger.interval.total_seconds() != scan.polling_interval:
+            scheduler.remove_job(job_id)
+            never_run = scan.id not in scan_ids_with_runs
+            _add_scan_job(scheduler, scan, session_factory, settings, immediate=never_run)
+            logger.info("Rescheduled %s: interval changed to %ds", job_id, scan.polling_interval)
 
 
 def start_scheduler(session_factory, settings) -> BackgroundScheduler:

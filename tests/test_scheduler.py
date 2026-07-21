@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from apscheduler.triggers.interval import IntervalTrigger
 from db.models import Base, User, Scan
 from core.scheduler import sync_jobs
 
@@ -11,6 +12,13 @@ def factory():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)
+
+
+def _fake_job(job_id, interval_seconds):
+    job = MagicMock()
+    job.id = job_id
+    job.trigger = IntervalTrigger(seconds=interval_seconds)
+    return job
 
 
 def add_scan(factory, status="active", interval=300):
@@ -113,3 +121,35 @@ def test_start_scheduler_syncs_every_30_seconds(factory):
         assert job.trigger.interval.total_seconds() == 30
     finally:
         scheduler.shutdown(wait=False)
+
+
+def test_sync_reschedules_job_when_interval_changed(factory):
+    from datetime import datetime, timezone
+    from db.models import ScanRun, ScanOutcome
+    scan_id = add_scan(factory, status="active", interval=300)
+    with factory() as db:
+        db.add(ScanRun(
+            scan_id=scan_id, started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc), outcome=ScanOutcome.success, sites_found=0,
+        ))
+        db.query(Scan).filter(Scan.id == scan_id).update({"polling_interval": 60})
+        db.commit()
+    existing_job = _fake_job(f"scan_{scan_id}", 300)
+    scheduler = MagicMock()
+    scheduler.get_jobs.return_value = [existing_job]
+    sync_jobs(scheduler, factory, MagicMock())
+    scheduler.remove_job.assert_called_once_with(f"scan_{scan_id}")
+    scheduler.add_job.assert_called_once()
+    kwargs = scheduler.add_job.call_args[1]
+    assert kwargs["trigger"].interval.total_seconds() == 60
+    assert "next_run_time" not in kwargs  # already ran before — no forced immediate fire
+
+
+def test_sync_leaves_job_untouched_when_interval_unchanged(factory):
+    scan_id = add_scan(factory, status="active", interval=300)
+    existing_job = _fake_job(f"scan_{scan_id}", 300)
+    scheduler = MagicMock()
+    scheduler.get_jobs.return_value = [existing_job]
+    sync_jobs(scheduler, factory, MagicMock())
+    scheduler.remove_job.assert_not_called()
+    scheduler.add_job.assert_not_called()
