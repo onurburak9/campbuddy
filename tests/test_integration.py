@@ -59,7 +59,10 @@ def seed(factory, fernet_key):
 def make_site():
     s = MagicMock()
     s.campsite_id = "10357088"
+    s.facility_id = "232447"
     s.facility_name = "Union West"
+    s.recreation_area_id = "2991"
+    s.recreation_area = "Inyo National Forest"
     s.campsite_site_name = "1"
     s.campsite_type = "STANDARD NONELECTRIC"
     s.booking_date = datetime(2026, 7, 3)
