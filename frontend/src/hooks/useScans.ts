@@ -20,6 +20,8 @@ export function useScanStats(id: number | null) {
     queryKey: id ? queryKeys.stats(id) : ["scans", "none", "stats"],
     queryFn: () => scans.stats(id as number),
     enabled: id != null,
+    refetchInterval: (query) =>
+      query.state.data && query.state.data.total_runs === 0 ? 5000 : false,
   });
 }
 

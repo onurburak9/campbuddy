@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { relativeTime, dateRange, duration, dateTime } from "./format";
+import { relativeTime, dateRange, duration, dateTime, relativeFuture, formatSeconds } from "./format";
 import { formatInterval } from "./format";
 
 describe("format", () => {
@@ -20,6 +20,20 @@ describe("format", () => {
   });
   it("duration renders seconds", () => {
     expect(duration("2026-06-24T11:59:48Z", "2026-06-24T12:00:00Z")).toBe("12s");
+  });
+  it("relativeFuture renders \"due now\" for a due or overdue time", () => {
+    expect(relativeFuture("2026-06-24T12:00:00Z")).toBe("due now");
+    expect(relativeFuture("2026-06-24T11:59:00Z")).toBe("due now");
+  });
+  it("relativeFuture renders minutes ahead", () => {
+    expect(relativeFuture("2026-06-24T12:05:00Z")).toMatch(/in 5 min/);
+  });
+  it("relativeFuture renders hours ahead", () => {
+    expect(relativeFuture("2026-06-24T15:00:00Z")).toMatch(/in 3 hr/);
+  });
+  it("formatSeconds renders sub-minute and multi-minute durations", () => {
+    expect(formatSeconds(12)).toBe("12s");
+    expect(formatSeconds(75)).toBe("1m 15s");
   });
 });
 

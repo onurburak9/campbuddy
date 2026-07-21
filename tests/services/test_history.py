@@ -345,3 +345,85 @@ def test_list_runs_filters_by_started_after(db, seeded_scan_with_runs):
     assert all(r.started_at >= cutoff for r in recent)
     all_runs = history_svc.list_runs(db, scan.id, scan.user_id)
     assert len(recent) <= len(all_runs)
+
+
+# ---------------------------------------------------------------------------
+# New tests: next_run_at and last_run_duration_seconds
+# ---------------------------------------------------------------------------
+
+def test_stats_next_run_at_none_for_paused_scan(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status="paused")
+    db.add(scan)
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["next_run_at"] is None
+
+
+def test_stats_next_run_at_now_for_never_run_active_scan(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["next_run_at"] is not None
+    assert abs((result["next_run_at"] - datetime.now(timezone.utc)).total_seconds()) < 5
+
+
+def test_stats_next_run_at_clamped_to_now_when_overdue(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, polling_interval=300)
+    db.add(scan)
+    db.flush()
+    started = datetime.now(timezone.utc) - timedelta(hours=1)
+    db.add(ScanRun(
+        scan_id=scan.id, started_at=started, finished_at=started + timedelta(seconds=5),
+        outcome=ScanOutcome.success, sites_found=0,
+    ))
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    # last run was an hour ago with a 300s interval — the "real" next fire is long past, clamp to now
+    assert abs((result["next_run_at"] - datetime.now(timezone.utc)).total_seconds()) < 5
+
+
+def test_stats_next_run_at_in_the_future_when_recently_run(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, polling_interval=300)
+    db.add(scan)
+    db.flush()
+    started = datetime.now(timezone.utc) - timedelta(seconds=10)
+    db.add(ScanRun(
+        scan_id=scan.id, started_at=started, finished_at=started + timedelta(seconds=2),
+        outcome=ScanOutcome.success, sites_found=0,
+    ))
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    expected = started + timedelta(seconds=300)
+    assert abs((result["next_run_at"] - expected).total_seconds()) < 2
+
+
+def test_stats_last_run_duration_seconds_none_when_no_finished_run(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["last_run_duration_seconds"] is None
+
+
+def test_stats_last_run_duration_seconds_from_most_recently_started_finished_run(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    older_start = datetime.now(timezone.utc) - timedelta(hours=1)
+    newer_start = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db.add_all([
+        ScanRun(scan_id=scan.id, started_at=older_start, finished_at=older_start + timedelta(seconds=20),
+                outcome=ScanOutcome.success, sites_found=0),
+        ScanRun(scan_id=scan.id, started_at=newer_start, finished_at=newer_start + timedelta(seconds=7),
+                outcome=ScanOutcome.success, sites_found=0),
+    ])
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["last_run_duration_seconds"] == 7
