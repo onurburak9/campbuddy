@@ -181,7 +181,10 @@ class ScanResultResponse(BaseModel):
     scan_run_id: int
     scan_id: int
     campsite_id: str
+    facility_id: Optional[str]
     facility_name: str
+    recreation_area_id: Optional[str]
+    recreation_area: Optional[str]
     site_name: str
     campsite_type: str
     booking_date: date
