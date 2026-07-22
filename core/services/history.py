@@ -1,6 +1,11 @@
-from db.models import ScanRun, ScanResult, ScanOutcome
+from datetime import datetime, timezone, timedelta
+from db.models import ScanRun, ScanResult, ScanOutcome, ScanStatus
 from core.services.scans import get_scan
 from core.services.exceptions import NotFound
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 
 def _filtered_runs_query(db, scan_id: int, outcome=None, started_after=None):
@@ -58,7 +63,7 @@ def list_results(db, scan_id: int, user_id: int, page: int = 1, page_size: int =
 
 
 def stats(db, scan_id: int, user_id: int) -> dict:
-    get_scan(db, scan_id, user_id)
+    scan = get_scan(db, scan_id, user_id)
     sites_found = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).count()
     in_cart = (
         db.query(ScanResult)
@@ -75,9 +80,28 @@ def stats(db, scan_id: int, user_id: int) -> dict:
             if r.outcome in (ScanOutcome.success, ScanOutcome.no_results)
         )
         success_rate = round(successful / total_runs * 100)
+
+    latest_run = max(runs, key=lambda r: r.started_at, default=None)
+    if scan.status != ScanStatus.active:
+        next_run_at = None
+    elif latest_run is None:
+        next_run_at = _now()
+    else:
+        candidate = latest_run.started_at + timedelta(seconds=scan.polling_interval)
+        next_run_at = max(_now(), candidate)
+
+    finished_runs = [r for r in runs if r.finished_at is not None]
+    last_finished_run = max(finished_runs, key=lambda r: r.started_at, default=None)
+    last_run_duration_seconds = (
+        (last_finished_run.finished_at - last_finished_run.started_at).total_seconds()
+        if last_finished_run else None
+    )
+
     return {
         "sites_found": sites_found,
         "in_cart": in_cart,
         "total_runs": total_runs,
         "success_rate": success_rate,
+        "next_run_at": next_run_at,
+        "last_run_duration_seconds": last_run_duration_seconds,
     }

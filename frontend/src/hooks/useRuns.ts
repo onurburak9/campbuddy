@@ -10,11 +10,13 @@ export function useScanRuns(
   pageSize: number = PAGE_SIZE,
   outcome?: string,
   startedAfter?: string,
+  options?: { refetchInterval?: number | false },
 ) {
   return useQuery({
     queryKey: scanId ? queryKeys.runs(scanId, page, pageSize, outcome, startedAfter) : ["scans", "none", "runs", page],
     queryFn: () => runs.list(scanId as number, page, pageSize, outcome, startedAfter),
     enabled: scanId != null,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

@@ -58,4 +58,16 @@ describe("ConfigCard", () => {
       "https://www.recreation.gov/camping/campsites/42",
     );
   });
+
+  it("renders a target-count summary line", () => {
+    render(<ConfigCard scan={scan} />);
+    expect(screen.getByText("Monitoring 2 campgrounds")).toBeInTheDocument();
+  });
+
+  it("joins multiple target categories in the summary", () => {
+    render(<ConfigCard scan={scanWithAllIds} />);
+    expect(
+      screen.getByText("Monitoring 1 campground across 1 recreation area across 1 campsite"),
+    ).toBeInTheDocument();
+  });
 });

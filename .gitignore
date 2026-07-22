@@ -13,5 +13,6 @@ build/
 .playwright-mcp/
 .claude/worktrees/
 .superpowers/brainstorm/
+.superpowers/sdd/
 frontend/node_modules
 frontend/dist

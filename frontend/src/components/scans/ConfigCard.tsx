@@ -27,6 +27,19 @@ const AREA_URL = (id: number) => `https://www.recreation.gov/gateways/${id}`;
 const CAMPGROUND_URL = (id: number) => `https://www.recreation.gov/camping/campgrounds/${id}`;
 const CAMPSITE_URL = (id: number) => `https://www.recreation.gov/camping/campsites/${id}`;
 
+function countLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
+function targetSummary(scan: Scan): string | null {
+  const parts = [
+    scan.campground_ids?.length ? countLabel(scan.campground_ids.length, "campground") : null,
+    scan.rec_area_ids?.length ? countLabel(scan.rec_area_ids.length, "recreation area") : null,
+    scan.campsite_ids?.length ? countLabel(scan.campsite_ids.length, "campsite") : null,
+  ].filter(Boolean) as string[];
+  return parts.length ? `Monitoring ${parts.join(" across ")}` : null;
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
@@ -45,10 +58,14 @@ export function ConfigCard({ scan }: { scan: Scan }) {
     ]
       .filter(Boolean)
       .join(" · ") || "None";
+  const summary = targetSummary(scan);
 
   return (
     <div className="rounded-lg border border-sand-200 bg-white p-5 dark:border-[#222] dark:bg-[#1A1A1A]">
       <h3 className="mb-3 text-sm font-semibold text-stone-800 dark:text-[#EEE]">Configuration</h3>
+      {summary && (
+        <p className="mb-3 text-sm text-stone-600 dark:text-[#AAA]">{summary}</p>
+      )}
       <div className="space-y-2">
         <Row label="Provider">{scan.provider}</Row>
         <Row label="Recreation areas"><IdLinks values={scan.rec_area_ids} base={AREA_URL} /></Row>

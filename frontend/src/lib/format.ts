@@ -17,19 +17,36 @@ export function dateRange(start: string, end: string): string {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-export function duration(start: string, end: string | null): string {
-  if (!end) return "—";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  const sec = Math.round(ms / 1000);
+export function formatSeconds(seconds: number): string {
+  const sec = Math.round(seconds);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
   return `${min}m ${sec % 60}s`;
+}
+
+export function duration(start: string, end: string | null): string {
+  if (!end) return "—";
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  return formatSeconds(ms / 1000);
 }
 
 export function dateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
   });
+}
+
+export function relativeFuture(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffSec = Math.round((then - Date.now()) / 1000);
+  if (diffSec <= 0) return "due now";
+  if (diffSec < 60) return `in ${diffSec}s`;
+  const mins = Math.round(diffSec / 60);
+  if (mins < 60) return `in ${mins} min`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `in ${hours} hr`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? "" : "s"}`;
 }
 
 export function formatInterval(seconds: number): string {

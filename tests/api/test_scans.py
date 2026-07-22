@@ -357,3 +357,15 @@ def test_results_endpoint_returns_null_identifiers_for_legacy_rows(auth_client, 
     assert body["facility_id"] is None
     assert body["recreation_area_id"] is None
     assert body["recreation_area"] is None
+
+
+def test_get_stats_includes_next_run_and_duration_fields(auth_client):
+    client, _ = auth_client
+    create = client.post("/api/v1/scans", json={"search_windows": WINDOWS})
+    scan_id = create.json()["id"]
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "next_run_at" in data
+    assert data["next_run_at"] is not None  # never-run active scan → "now"
+    assert data["last_run_duration_seconds"] is None
