@@ -58,6 +58,9 @@ def make_site(campsite_id="10357088", check_in=date(2026, 7, 3)):
     site.booking_end_date = datetime.combine(date(2026, 7, 6), datetime.min.time())
     site.booking_url = f"https://www.recreation.gov/camping/campsites/{campsite_id}"
     site.booking_nights = 3
+    site.facility_id = 232447
+    site.recreation_area_id = 2991
+    site.recreation_area = "Yosemite National Park"
     return site
 
 
@@ -298,3 +301,14 @@ def test_notified_only_set_on_available_success(factory, scan_id, settings, mock
     with factory() as db:
         r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
         assert r is not None and r.notified is False
+
+
+def test_run_persists_facility_and_area_identifiers(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        r = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).one()
+        assert r.facility_id == "232447"
+        assert r.recreation_area_id == "2991"
+        assert r.recreation_area == "Yosemite National Park"

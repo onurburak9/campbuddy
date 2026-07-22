@@ -2,7 +2,7 @@ from datetime import datetime, date, timezone
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from db.models import (
     Base,
@@ -282,3 +282,40 @@ def test_user_hashed_password_nullable(db):
     db.add(user)
     db.commit()
     assert user.hashed_password is None
+
+
+def test_scan_result_has_nullable_campground_identity_columns():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine)
+    with SessionLocal() as db:
+        user = User(email="ident@example.com")
+        db.add(user)
+        db.flush()
+        scan = Scan(user_id=user.id, search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}])
+        db.add(scan)
+        db.flush()
+        run = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc))
+        db.add(run)
+        db.flush()
+        result = ScanResult(
+            scan_run_id=run.id, scan_id=scan.id, campsite_id="1",
+            facility_name="F", site_name="S", campsite_type="T",
+            booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
+            booking_url="https://example.com",
+            first_seen_at=datetime.now(timezone.utc), last_seen_at=datetime.now(timezone.utc),
+        )
+        db.add(result)
+        db.commit()
+        assert result.facility_id is None
+        assert result.recreation_area_id is None
+        assert result.recreation_area is None
+
+        result.facility_id = "232447"
+        result.recreation_area_id = "2991"
+        result.recreation_area = "Yosemite National Park"
+        db.commit()
+        db.refresh(result)
+        assert result.facility_id == "232447"
+        assert result.recreation_area_id == "2991"
+        assert result.recreation_area == "Yosemite National Park"

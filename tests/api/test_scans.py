@@ -320,6 +320,45 @@ def test_runs_started_after_filter(auth_client, scan_with_runs):
         assert item["started_at"] >= cutoff
 
 
+def test_results_endpoint_includes_campground_identifiers(auth_client):
+    from db.models import ScanRun, ScanResult
+    from datetime import datetime, timezone, date
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    with get_db(api_db.get_factory()) as db:
+        run = ScanRun(scan_id=scan_id, started_at=datetime.now(timezone.utc), sites_found=1)
+        db.add(run)
+        db.flush()
+        result = ScanResult(
+            scan_run_id=run.id, scan_id=scan_id, campsite_id="1",
+            facility_id="232447", facility_name="Upper Pines Campground",
+            recreation_area_id="2991", recreation_area="Yosemite National Park",
+            site_name="Site 1", campsite_type="TENT",
+            booking_date=date(2026, 7, 3), booking_end_date=date(2026, 7, 6),
+            booking_url="https://example.com",
+            first_seen_at=datetime.now(timezone.utc), last_seen_at=datetime.now(timezone.utc),
+        )
+        db.add(result)
+        db.flush()
+    r = client.get(f"/api/v1/scans/{scan_id}/results")
+    assert r.status_code == 200
+    body = r.json()[0]
+    assert body["facility_id"] == "232447"
+    assert body["recreation_area_id"] == "2991"
+    assert body["recreation_area"] == "Yosemite National Park"
+
+
+def test_results_endpoint_returns_null_identifiers_for_legacy_rows(auth_client, scan_with_results):
+    client, _ = auth_client
+    scan, _ = scan_with_results
+    r = client.get(f"/api/v1/scans/{scan.id}/results")
+    assert r.status_code == 200
+    body = r.json()[0]
+    assert body["facility_id"] is None
+    assert body["recreation_area_id"] is None
+    assert body["recreation_area"] is None
+
+
 def test_get_stats_includes_next_run_and_duration_fields(auth_client):
     client, _ = auth_client
     create = client.post("/api/v1/scans", json={"search_windows": WINDOWS})

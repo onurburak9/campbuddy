@@ -58,3 +58,64 @@ describe("ResultsTab (client-side filtering)", () => {
     await waitFor(() => expect(screen.getByText(/no results match your filters/i)).toBeInTheDocument());
   });
 });
+
+describe("ResultsTab (view toggle)", () => {
+  it("defaults to Flat view when no results are groupable", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(rows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+    expect(screen.getByRole("option", { name: "All campgrounds" })).toBeInTheDocument();
+  });
+
+  it("defaults to Grouped view when results are groupable, hiding the facility filter", async () => {
+    const groupedRows = [
+      { ...rows[0], facility_id: "232447", recreation_area_id: "2991", recreation_area: "Yosemite National Park" },
+    ];
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(groupedRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: "All campgrounds" })).not.toBeInTheDocument();
+  });
+
+  it("switches to the flat list when the Flat toggle is clicked", async () => {
+    const groupedRows = [
+      { ...rows[0], facility_id: "232447", recreation_area_id: "2991", recreation_area: "Yosemite National Park" },
+    ];
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(groupedRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Flat" }));
+    expect(screen.queryByText("Yosemite National Park")).not.toBeInTheDocument();
+    expect(screen.getByText("Site 42")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "All campgrounds" })).toBeInTheDocument();
+  });
+
+  it("switches back to the grouped view when the Grouped toggle is clicked", async () => {
+    const groupedRows = [
+      { ...rows[0], facility_id: "232447", recreation_area_id: "2991", recreation_area: "Yosemite National Park" },
+    ];
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(groupedRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Flat" }));
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Grouped" }));
+    expect(screen.getByText("Yosemite National Park")).toBeInTheDocument();
+  });
+
+  it("hides a group entirely when the type filter excludes all of its rows", async () => {
+    const groupedRows = [
+      { ...rows[0], id: 1, site_name: "Tent Site", campsite_type: "TENT", facility_id: "232447", facility_name: "Upper Pines", recreation_area_id: "2991", recreation_area: "Yosemite National Park" },
+      { ...rows[0], id: 2, site_name: "RV Site", campsite_type: "RV", facility_id: "999", facility_name: "Lower Pines", recreation_area_id: "2991", recreation_area: "Yosemite National Park" },
+    ];
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(groupedRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getAllByText("Upper Pines").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("Lower Pines").length).toBeGreaterThan(0);
+
+    const typeSelect = screen.getByRole("option", { name: "All types" }).closest("select")!;
+    await userEvent.selectOptions(typeSelect, "TENT");
+    await waitFor(() => expect(screen.queryByText("Lower Pines")).not.toBeInTheDocument());
+    expect(screen.getAllByText("Upper Pines").length).toBeGreaterThan(0);
+  });
+});
