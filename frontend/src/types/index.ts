@@ -56,7 +56,10 @@ export interface ScanResult {
   scan_run_id: number;
   scan_id: number;
   campsite_id: string;
+  facility_id: string | null;
   facility_name: string;
+  recreation_area_id: string | null;
+  recreation_area: string | null;
   site_name: string;
   campsite_type: string;
   booking_date: string;
