@@ -2,7 +2,7 @@ import pytest
 import hashlib
 from datetime import datetime, timezone, timedelta
 from db.models import User, Scan, PasswordResetToken
-from core.services.users import get_user_by_email, update_profile, scans_used, register_user, create_password_reset_token, reset_password_with_token
+from core.services.users import get_user_by_email, update_profile, scans_used, register_user, create_password_reset_token, reset_password_with_token, set_admin, list_users_with_scan_counts
 from core.services import scans as scans_svc
 from core.services.exceptions import NotFound, InvalidState
 from core.crypto import encrypt_password
@@ -212,3 +212,53 @@ def test_reset_password_with_token_raises_not_found_for_soft_deleted_user(db):
     db.flush()
     with pytest.raises(NotFound):
         reset_password_with_token(db, token, "hashed")
+
+
+def test_set_admin_grants_admin(db):
+    make_user(db, "admin@e.com")
+    result = set_admin(db, "admin@e.com", True)
+    assert result.is_admin is True
+
+
+def test_set_admin_revokes_admin(db):
+    make_user(db, "admin@e.com")
+    set_admin(db, "admin@e.com", True)
+    result = set_admin(db, "admin@e.com", False)
+    assert result.is_admin is False
+
+
+def test_set_admin_raises_not_found_for_missing_user(db):
+    with pytest.raises(NotFound):
+        set_admin(db, "ghost@e.com", True)
+
+
+def test_list_users_with_scan_counts_counts_active_scans(db):
+    u1 = make_user(db, "a@e.com")
+    u2 = make_user(db, "b@e.com")
+    db.add_all([
+        Scan(user_id=u1.id, search_windows=WINDOWS),
+        Scan(user_id=u1.id, search_windows=WINDOWS),
+    ])
+    db.flush()
+    counts = dict((u.id, count) for u, count in list_users_with_scan_counts(db))
+    assert counts[u1.id] == 2
+    assert counts[u2.id] == 0
+
+
+def test_list_users_with_scan_counts_excludes_soft_deleted_users(db):
+    from datetime import datetime, timezone
+    u = make_user(db, "gone@e.com")
+    u.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    ids = [usr.id for usr, _ in list_users_with_scan_counts(db)]
+    assert u.id not in ids
+
+
+def test_list_users_with_scan_counts_excludes_soft_deleted_scans(db):
+    from datetime import datetime, timezone
+    u = make_user(db, "a@e.com")
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, deleted_at=datetime.now(timezone.utc))
+    db.add(scan)
+    db.flush()
+    counts = dict((usr.id, count) for usr, count in list_users_with_scan_counts(db))
+    assert counts[u.id] == 0
