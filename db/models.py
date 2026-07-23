@@ -85,6 +85,7 @@ class User(Base):
     )
     hashed_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     scan_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     scans: Mapped[list["Scan"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
