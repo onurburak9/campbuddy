@@ -76,15 +76,23 @@ describe("ResultCard", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("shows 'Available' badge when is_available is true", () => {
+  it("shows 'Available' badge with success tone and md size when is_available is true", () => {
     render(<ResultCard result={base} />);
-    expect(screen.getByText("Available")).toBeInTheDocument();
+    const badge = screen.getByText("Available");
+    expect(badge).toBeInTheDocument();
+    expect(badge.className).toMatch(/bg-green-100/);
+    expect(badge.className).toMatch(/text-sm/);
+    expect(badge.className).toMatch(/font-semibold/);
     expect(screen.queryByText("Gone")).not.toBeInTheDocument();
   });
 
-  it("shows 'Gone' badge when is_available is false", () => {
+  it("shows 'Gone' badge with error (red) tone and md size when is_available is false", () => {
     render(<ResultCard result={{ ...base, is_available: false }} />);
-    expect(screen.getByText("Gone")).toBeInTheDocument();
+    const badge = screen.getByText("Gone");
+    expect(badge).toBeInTheDocument();
+    expect(badge.className).toMatch(/bg-red-100/);
+    expect(badge.className).toMatch(/text-sm/);
+    expect(badge.className).toMatch(/font-semibold/);
     expect(screen.queryByText("Available")).not.toBeInTheDocument();
   });
 
