@@ -21,7 +21,7 @@ describe("OverviewTab", () => {
   it("shows last checked and last new site found", async () => {
     server.use(
       http.get("/api/v1/scans/7/stats", () => HttpResponse.json({
-        sites_found: 1, in_cart: 0, total_runs: 5, success_rate: 80,
+        sites_found: 1, in_cart: 0, total_runs: 5, success_rate: 80, hit_rate: 60,
         next_run_at: NEXT_RUN_AT, last_run_duration_seconds: 12,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([{ id: 9, scan_id: 7, started_at: "2026-06-30T11:00:00Z", finished_at: "2026-06-30T11:00:03Z", outcome: "success", sites_found: 1, error_message: null }])),
@@ -30,12 +30,17 @@ describe("OverviewTab", () => {
     wrap(<OverviewTab scan={scan} />);
     await waitFor(() => expect(screen.getByText(/Last checked/i)).toBeInTheDocument());
     expect(screen.getByText(/Last new site found/i)).toBeInTheDocument();
+    expect(screen.getByText("Hit Rate")).toBeInTheDocument();
+    // "Hit Rate" tile renders immediately with a 0% fallback and only picks up
+    // the real value once the stats query settles — wait for it like the
+    // next-run/last-run-duration assertions below do.
+    await waitFor(() => expect(screen.getByText("60%")).toBeInTheDocument());
   });
 
   it("shows next run time and last run duration from stats", async () => {
     server.use(
       http.get("/api/v1/scans/7/stats", () => HttpResponse.json({
-        sites_found: 1, in_cart: 0, total_runs: 5, success_rate: 80,
+        sites_found: 1, in_cart: 0, total_runs: 5, success_rate: 80, hit_rate: 60,
         next_run_at: NEXT_RUN_AT, last_run_duration_seconds: 12,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([])),
@@ -54,7 +59,7 @@ describe("OverviewTab", () => {
   it("shows dashes for next run and last run duration when absent", async () => {
     server.use(
       http.get("/api/v1/scans/7/stats", () => HttpResponse.json({
-        sites_found: 0, in_cart: 0, total_runs: 0, success_rate: 0,
+        sites_found: 0, in_cart: 0, total_runs: 0, success_rate: 0, hit_rate: 0,
         next_run_at: null, last_run_duration_seconds: null,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([])),

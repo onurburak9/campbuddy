@@ -81,6 +81,12 @@ def stats(db, scan_id: int, user_id: int) -> dict:
         )
         success_rate = round(successful / total_runs * 100)
 
+    if total_runs == 0:
+        hit_rate = 0
+    else:
+        hits = sum(1 for r in runs if r.sites_found > 0)
+        hit_rate = round(hits / total_runs * 100)
+
     latest_run = max(runs, key=lambda r: r.started_at, default=None)
     if scan.status != ScanStatus.active:
         next_run_at = None
@@ -102,6 +108,7 @@ def stats(db, scan_id: int, user_id: int) -> dict:
         "in_cart": in_cart,
         "total_runs": total_runs,
         "success_rate": success_rate,
+        "hit_rate": hit_rate,
         "next_run_at": next_run_at,
         "last_run_duration_seconds": last_run_duration_seconds,
     }
