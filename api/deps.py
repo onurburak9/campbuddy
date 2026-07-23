@@ -4,6 +4,7 @@ from typing import Optional
 from api.auth import decode_token, COOKIE_NAME
 from api.database import get_factory
 from config.settings import get_settings
+from core.services.exceptions import Forbidden
 from db.models import User
 from db.session import get_db
 
@@ -41,4 +42,10 @@ def get_current_user(
             detail="Invalid or expired session",
             headers={"WWW-Authenticate": "Cookie"},
         )
+    return user
+
+
+def get_current_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise Forbidden("Admin access required")
     return user
