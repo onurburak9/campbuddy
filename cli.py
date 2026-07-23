@@ -360,5 +360,23 @@ def delete_user(user_id: int):
     click.echo(f"User {user_id} deleted (history retained for {_RETENTION_DAYS} days).")
 
 
+@cli.command("promote-admin")
+@click.argument("email")
+@click.option("--revoke", is_flag=True, help="Revoke admin instead of granting it.")
+def promote_admin(email: str, revoke: bool):
+    """Grant (or revoke) admin access for the user identified by EMAIL."""
+    from core.services.users import set_admin
+    from core.services.exceptions import NotFound
+    factory, _ = get_factory()
+    with get_db(factory) as db:
+        try:
+            user = set_admin(db, email, not revoke)
+        except NotFound:
+            click.echo(f"Error: User '{email}' not found.")
+            raise SystemExit(1)
+        state = "revoked from" if revoke else "granted to"
+        click.echo(f"Admin access {state} {user.email}.")
+
+
 if __name__ == "__main__":
     cli()
