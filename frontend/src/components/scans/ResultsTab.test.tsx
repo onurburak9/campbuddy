@@ -59,6 +59,46 @@ describe("ResultsTab (client-side filtering)", () => {
   });
 });
 
+describe("ResultsTab (availability filter)", () => {
+  const availabilityRows = [
+    { ...rows[0], is_available: true },
+    { ...rows[1], is_available: false },
+    { ...rows[2], is_available: true },
+  ];
+
+  it("shows all results by default", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(availabilityRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+    expect(screen.getByText("Site 7")).toBeInTheDocument();
+    expect(screen.getByText("Loop A")).toBeInTheDocument();
+  });
+
+  it("filters to only available results when 'Available' is selected", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(availabilityRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+
+    const availabilitySelect = screen.getByRole("option", { name: "All statuses" }).closest("select")!;
+    await userEvent.selectOptions(availabilitySelect, "available");
+    await waitFor(() => expect(screen.queryByText("Site 7")).not.toBeInTheDocument());
+    expect(screen.getByText("Site 42")).toBeInTheDocument();
+    expect(screen.getByText("Loop A")).toBeInTheDocument();
+  });
+
+  it("filters to only gone results when 'Gone' is selected", async () => {
+    server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(availabilityRows)));
+    wrap(<ResultsTab scanId={7} />);
+    await waitFor(() => expect(screen.getByText("Site 42")).toBeInTheDocument());
+
+    const availabilitySelect = screen.getByRole("option", { name: "All statuses" }).closest("select")!;
+    await userEvent.selectOptions(availabilitySelect, "gone");
+    await waitFor(() => expect(screen.getByText("Site 7")).toBeInTheDocument());
+    expect(screen.queryByText("Site 42")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loop A")).not.toBeInTheDocument();
+  });
+});
+
 describe("ResultsTab (view toggle)", () => {
   it("defaults to Flat view when no results are groupable", async () => {
     server.use(http.get("/api/v1/scans/7/results", () => HttpResponse.json(rows)));

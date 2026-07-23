@@ -29,7 +29,7 @@ const scan5: Scan = {
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 };
 
-const emptyStats = { sites_found: 0, in_cart: 0, total_runs: 0, success_rate: 0 };
+const emptyStats = { sites_found: 0, in_cart: 0, total_runs: 0, success_rate: 0, hit_rate: 0 };
 
 describe("ScanDetailPanel", () => {
   it("remounts tab content when switching scans — Settings tab shows new scan name", async () => {

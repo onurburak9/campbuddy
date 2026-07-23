@@ -163,6 +163,7 @@ def test_stats_returns_zeros_for_new_scan(db):
     assert result["in_cart"] == 0
     assert result["total_runs"] == 0
     assert result["success_rate"] == 0
+    assert result["hit_rate"] == 0
 
 
 def test_stats_counts_results_and_runs(db):
@@ -221,6 +222,38 @@ def test_stats_success_rate_rounds_to_int(db):
     db.flush()
     result = stats(db, scan.id, u.id)
     assert result["success_rate"] == 33
+
+
+def test_stats_hit_rate_counts_runs_with_sites_found_regardless_of_outcome(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    # Two runs found sites (one "success", one "error" that still recorded finds
+    # before failing); two runs found nothing.
+    run1 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.success, sites_found=3)
+    run2 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.error, sites_found=1)
+    run3 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.success, sites_found=0)
+    run4 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.no_results, sites_found=0)
+    db.add_all([run1, run2, run3, run4])
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["total_runs"] == 4
+    assert result["hit_rate"] == 50
+
+
+def test_stats_hit_rate_rounds_to_int(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    run1 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.success, sites_found=1)
+    run2 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.no_results, sites_found=0)
+    run3 = ScanRun(scan_id=scan.id, started_at=datetime.now(timezone.utc), outcome=ScanOutcome.no_results, sites_found=0)
+    db.add_all([run1, run2, run3])
+    db.flush()
+    result = stats(db, scan.id, u.id)
+    assert result["hit_rate"] == 33
 
 
 def test_stats_raises_not_found_for_wrong_owner(db):

@@ -24,6 +24,7 @@ export function OverviewTab({ scan }: { scan: Scan }) {
         inCart={stats?.in_cart ?? 0}
         totalRuns={stats?.total_runs ?? 0}
         successRate={stats?.success_rate ?? 0}
+        hitRate={stats?.hit_rate ?? 0}
       />
       <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm text-stone-500 dark:text-[#888]">
         <span>Last checked: <span className="text-stone-700 dark:text-[#CCC]">{lastChecked ? relativeTime(lastChecked) : "—"}</span></span>
