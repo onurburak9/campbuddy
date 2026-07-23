@@ -17,6 +17,7 @@ export function ResultsTab({ scanId }: { scanId: number }) {
   const [search, setSearch] = useState("");
   const [facility, setFacility] = useState("all");
   const [type, setType] = useState("all");
+  const [availability, setAvailability] = useState<"all" | "available" | "gone">("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(RESULTS_PAGE_SIZE);
   const [view, setView] = useState<ViewMode>("grouped");
@@ -43,9 +44,10 @@ export function ResultsTab({ scanId }: { scanId: number }) {
       (r) =>
         (view === "flat" ? facility === "all" || r.facility_name === facility : true) &&
         (type === "all" || r.campsite_type === type) &&
+        (availability === "all" || (availability === "available" ? r.is_available : !r.is_available)) &&
         (q === "" || `${r.site_name} ${r.facility_name}`.toLowerCase().includes(q)),
     );
-  }, [all, search, facility, type, view]);
+  }, [all, search, facility, type, availability, view]);
 
   if (isLoading) return <div className="flex justify-center py-8"><Spinner /></div>;
   if (!all || all.length === 0)
@@ -100,6 +102,15 @@ export function ResultsTab({ scanId }: { scanId: number }) {
           value={type}
           onChange={(v) => { setType(v); resetPage(); }}
           options={[{ value: "all", label: "All types" }, ...types.map((t) => ({ value: t, label: t }))]}
+        />
+        <Select
+          value={availability}
+          onChange={(v) => { setAvailability(v as "all" | "available" | "gone"); resetPage(); }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "available", label: "Available" },
+            { value: "gone", label: "Gone" },
+          ]}
         />
         {view === "flat" && (
           <div className="ml-auto">
