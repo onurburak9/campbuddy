@@ -14,6 +14,7 @@ export interface ScanStats {
   in_cart: number;
   total_runs: number;
   success_rate: number; // 0–100
+  hit_rate: number; // 0–100
   next_run_at: string | null;
   last_run_duration_seconds: number | null;
 }

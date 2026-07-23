@@ -7,15 +7,16 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
-export function StatsRow({ sitesFound, inCart, totalRuns, successRate }: {
-  sitesFound: number; inCart: number; totalRuns: number; successRate: number;
+export function StatsRow({ sitesFound, inCart, totalRuns, successRate, hitRate }: {
+  sitesFound: number; inCart: number; totalRuns: number; successRate: number; hitRate: number;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
       <Stat label="Sites Found" value={String(sitesFound)} tone="text-[#60A5FA]" />
       <Stat label="In Cart" value={String(inCart)} tone="text-campfire-600" />
       <Stat label="Total Runs" value={String(totalRuns)} />
       <Stat label="Success Rate" value={`${successRate}%`} tone="text-[#22C55E]" />
+      <Stat label="Hit Rate" value={`${hitRate}%`} tone="text-[#A855F7]" />
     </div>
   );
 }
