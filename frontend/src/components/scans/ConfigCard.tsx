@@ -1,24 +1,38 @@
 import { dateRange, formatInterval } from "../../lib/format";
 import { cn } from "../../lib/cn";
+import { search } from "../../api/search";
+import { useResolvedNames } from "../../hooks/useResolvedNames";
 import type { Scan } from "../../types";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function IdLinks({ values, base }: { values: number[] | null | undefined; base: (id: number) => string }) {
+function IdLinks({
+  values,
+  base,
+  names,
+}: {
+  values: number[] | null | undefined;
+  base: (id: number) => string;
+  names: Map<number, string>;
+}) {
   if (!values || !values.length) return <>—</>;
   return (
     <span className="inline-flex flex-wrap gap-x-2">
-      {values.map((id) => (
-        <a
-          key={id}
-          href={base(id)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-forest-700 hover:underline dark:text-forest-400"
-        >
-          {id}
-        </a>
-      ))}
+      {values.map((id) => {
+        const name = names.get(id);
+        return (
+          <a
+            key={id}
+            href={base(id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`ID ${id}`}
+            className="text-forest-700 hover:underline dark:text-forest-400"
+          >
+            {name ?? `#${id}`}
+          </a>
+        );
+      })}
     </span>
   );
 }
@@ -60,6 +74,10 @@ export function ConfigCard({ scan }: { scan: Scan }) {
       .join(" · ") || "None";
   const summary = targetSummary(scan);
 
+  const recAreaNames = useResolvedNames(scan.rec_area_ids ?? [], search.resolveRecreationAreas);
+  const campgroundNames = useResolvedNames(scan.campground_ids ?? [], search.resolveCampgrounds);
+  const campsiteNames = useResolvedNames(scan.campsite_ids ?? [], search.resolveCampsites);
+
   return (
     <div className="rounded-lg border border-sand-200 bg-white p-5 dark:border-[#222] dark:bg-[#1A1A1A]">
       <h3 className="mb-3 text-sm font-semibold text-stone-800 dark:text-[#EEE]">Configuration</h3>
@@ -68,9 +86,9 @@ export function ConfigCard({ scan }: { scan: Scan }) {
       )}
       <div className="space-y-2">
         <Row label="Provider">{scan.provider}</Row>
-        <Row label="Recreation areas"><IdLinks values={scan.rec_area_ids} base={AREA_URL} /></Row>
-        <Row label="Campgrounds"><IdLinks values={scan.campground_ids} base={CAMPGROUND_URL} /></Row>
-        <Row label="Campsites"><IdLinks values={scan.campsite_ids} base={CAMPSITE_URL} /></Row>
+        <Row label="Recreation areas"><IdLinks values={scan.rec_area_ids} base={AREA_URL} names={recAreaNames} /></Row>
+        <Row label="Campgrounds"><IdLinks values={scan.campground_ids} base={CAMPGROUND_URL} names={campgroundNames} /></Row>
+        <Row label="Campsites"><IdLinks values={scan.campsite_ids} base={CAMPSITE_URL} names={campsiteNames} /></Row>
         <Row label="Search windows">
           <span className="flex flex-wrap gap-1.5">
             {scan.search_windows.map((w, i) => (
