@@ -76,6 +76,21 @@ def test_me_has_telegram_false_when_telegram_chat_id_empty_string(auth_client):
     assert resp.json()["has_telegram"] is False
 
 
+def test_me_includes_is_admin_false_by_default(auth_client):
+    client, _ = auth_client
+    resp = client.get("/api/v1/auth/me")
+    assert resp.json()["is_admin"] is False
+
+
+def test_me_includes_is_admin_true_for_admin(auth_client):
+    client, info = auth_client
+    with get_db(api_db.get_factory()) as db:
+        user = db.query(User).filter(User.id == info["id"]).first()
+        user.is_admin = True
+    resp = client.get("/api/v1/auth/me")
+    assert resp.json()["is_admin"] is True
+
+
 def test_me_returns_401_without_cookie(client):
     resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401

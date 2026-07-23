@@ -66,6 +66,7 @@ class MeResponse(BaseModel):
     scan_limit: int
     scans_used: int
     has_telegram: bool
+    is_admin: bool
 
     class Config:
         orm_mode = True
