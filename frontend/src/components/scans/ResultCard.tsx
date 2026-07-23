@@ -22,7 +22,11 @@ export function ResultCard({ result }: { result: ScanResult }) {
       </div>
       <div className="flex flex-col items-end gap-2">
         <div className="flex gap-1.5">
-          {result.is_available ? <Badge tone="success">Available</Badge> : <Badge tone="neutral">Gone</Badge>}
+          {result.is_available ? (
+            <Badge tone="success" size="md">Available</Badge>
+          ) : (
+            <Badge tone="error" size="md">Gone</Badge>
+          )}
           {result.cart_added ? <Badge tone="accent">In cart</Badge> : <Badge tone="neutral">Not in cart</Badge>}
           {result.notified && <Badge tone="info">Notified</Badge>}
         </div>

@@ -10,9 +10,23 @@ const tones: Record<Tone, string> = {
   neutral: "bg-sand-100 text-stone-600 dark:bg-[#222] dark:text-[#888]",
 };
 
-export function Badge({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+type Size = "sm" | "md";
+const sizes: Record<Size, string> = {
+  sm: "px-2 py-0.5 text-xs font-medium",
+  md: "px-2.5 py-1 text-sm font-semibold",
+};
+
+export function Badge({
+  tone,
+  size = "sm",
+  children,
+}: {
+  tone: Tone;
+  size?: Size;
+  children: React.ReactNode;
+}) {
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", tones[tone])}>
+    <span className={cn("inline-flex items-center rounded-full", sizes[size], tones[tone])}>
       {children}
     </span>
   );
