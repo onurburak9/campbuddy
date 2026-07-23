@@ -66,6 +66,30 @@ def auth_client(client, user_in_db):
 
 
 @pytest.fixture
+def admin_in_db():
+    with get_db(api_db.get_factory()) as db:
+        user = User(
+            email="admin@example.com",
+            hashed_password=hash_password("password123"),
+            scan_limit=5,
+            is_admin=True,
+        )
+        db.add(user)
+        db.flush()
+        return {"id": user.id, "email": user.email}
+
+
+@pytest.fixture
+def admin_client(client, admin_in_db):
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@example.com", "password": "password123"},
+    )
+    assert resp.status_code == 200
+    return client, admin_in_db
+
+
+@pytest.fixture
 def scan_with_runs(user_in_db):
     """Return a Scan with one recent success run, one recent no_results run, and one old run."""
     with get_db(api_db.get_factory()) as db:
