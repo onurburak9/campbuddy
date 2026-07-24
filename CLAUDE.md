@@ -44,6 +44,10 @@ python cli.py resume <id>               # resume a paused scan
 python cli.py delete-scan <id>          # delete scan + all history
 python cli.py test-notify <scan_id>     # send a test notification
 
+# User management
+python cli.py list-users                # show all users and their scan counts
+python cli.py promote-admin <email>     # grant admin access (add --revoke to remove it)
+
 # Docker
 docker compose build
 docker compose up -d
