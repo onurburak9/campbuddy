@@ -69,4 +69,15 @@ describe("AdminScansTab", () => {
     renderTab();
     expect(await screen.findByText("Failed to load scans.")).toBeInTheDocument();
   });
+
+  it("shows an error banner when an action fails", async () => {
+    server.use(
+      http.get("/api/v1/admin/scans", () => HttpResponse.json([SCAN])),
+      http.post("/api/v1/admin/scans/1/pause", () => new HttpResponse(null, { status: 500 })),
+    );
+    renderTab();
+    await screen.findByText("Yosemite");
+    await userEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(await screen.findByText("Action failed. Please try again.")).toBeInTheDocument();
+  });
 });
