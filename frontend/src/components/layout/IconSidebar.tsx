@@ -123,6 +123,12 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
             className={cn(iconBtn, pathname === "/settings" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
             <img src="/icons/gear.svg" alt="" className="h-7 w-7" />
           </Link>
+          {user?.is_admin && (
+            <Link to="/admin" onClick={closeDrawer} aria-label="Admin" title="Admin"
+              className={cn(iconBtn, pathname === "/admin" ? "bg-forest-50 dark:bg-[#222]" : "hover:bg-sand-100 dark:hover:bg-[#222]")}>
+              <img src="/icons/tent.svg" alt="" className="h-7 w-7" />
+            </Link>
+          )}
         </div>
         <div
           ref={accountMenuRef}

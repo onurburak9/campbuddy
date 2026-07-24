@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -6,14 +6,19 @@ import { MemoryRouter } from "react-router-dom";
 const toggle = vi.fn();
 const logout = vi.fn().mockResolvedValue(undefined);
 const navigate = vi.fn();
+const mockUser = vi.fn((): { email: string; is_admin?: boolean } => ({ email: "a@b.c" }));
 vi.mock("../../contexts/ThemeContext", () => ({ useTheme: () => ({ theme: "light", toggle }) }));
-vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ logout, user: { email: "a@b.c" } }) }));
+vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ logout, user: mockUser() }) }));
 vi.mock("react-router-dom", async (orig) => ({
   ...(await orig<typeof import("react-router-dom")>()),
   useNavigate: () => navigate,
 }));
 
 import { IconSidebar } from "./IconSidebar";
+
+afterEach(() => {
+  mockUser.mockReturnValue({ email: "a@b.c" });
+});
 
 describe("IconSidebar", () => {
   it("toggles theme from the account menu", async () => {
@@ -111,5 +116,16 @@ describe("IconSidebar", () => {
 
     await user.tab();
     expect(document.activeElement).toBe(scansLink);
+  });
+
+  it("shows the admin link when the user is an admin", () => {
+    mockUser.mockReturnValue({ email: "a@b.c", is_admin: true });
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument();
+  });
+
+  it("hides the admin link when the user is not an admin", () => {
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
+    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
   });
 });
