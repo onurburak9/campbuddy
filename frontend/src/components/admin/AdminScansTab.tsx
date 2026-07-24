@@ -5,12 +5,13 @@ import { Button } from "../ui/Button";
 import { scanStatusTone } from "../layout/ScanListItem";
 
 export function AdminScansTab() {
-  const { data: scans, isLoading } = useAdminScans();
+  const { data: scans, isLoading, isError } = useAdminScans();
   const pause = useAdminPauseScan();
   const resume = useAdminResumeScan();
   const del = useAdminDeleteScan();
 
   if (isLoading) return <div className="flex justify-center p-8"><Spinner /></div>;
+  if (isError) return <p className="p-6 text-sm text-red-600 dark:text-red-400">Failed to load scans.</p>;
   if (!scans?.length) return <p className="p-6 text-sm text-stone-500 dark:text-[#888]">No scans found.</p>;
 
   async function onDelete(id: number, name: string | null) {

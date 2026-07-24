@@ -28,4 +28,10 @@ describe("AdminUsersTab", () => {
     renderTab();
     expect(await screen.findByText("No users found.")).toBeInTheDocument();
   });
+
+  it("shows an error state when the fetch fails", async () => {
+    server.use(http.get("/api/v1/admin/users", () => new HttpResponse(null, { status: 500 })));
+    renderTab();
+    expect(await screen.findByText("Failed to load users.")).toBeInTheDocument();
+  });
 });

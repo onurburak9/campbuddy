@@ -63,4 +63,10 @@ describe("AdminScansTab", () => {
     renderTab();
     expect(await screen.findByText("No scans found.")).toBeInTheDocument();
   });
+
+  it("shows an error state when the fetch fails", async () => {
+    server.use(http.get("/api/v1/admin/scans", () => new HttpResponse(null, { status: 500 })));
+    renderTab();
+    expect(await screen.findByText("Failed to load scans.")).toBeInTheDocument();
+  });
 });

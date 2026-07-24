@@ -3,9 +3,10 @@ import { Spinner } from "../ui/Spinner";
 import { Badge } from "../ui/Badge";
 
 export function AdminUsersTab() {
-  const { data: users, isLoading } = useAdminUsers();
+  const { data: users, isLoading, isError } = useAdminUsers();
 
   if (isLoading) return <div className="flex justify-center p-8"><Spinner /></div>;
+  if (isError) return <p className="p-6 text-sm text-red-600 dark:text-red-400">Failed to load users.</p>;
   if (!users?.length) return <p className="p-6 text-sm text-stone-500 dark:text-[#888]">No users found.</p>;
 
   return (
