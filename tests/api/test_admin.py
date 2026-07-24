@@ -59,6 +59,20 @@ def test_pause_scan_requires_admin(auth_client, user_in_db):
     assert resp.status_code == 403
 
 
+def test_resume_scan_requires_admin(auth_client, user_in_db):
+    client, _ = auth_client
+    scan_id = _make_scan(user_in_db["id"], status=ScanStatus.paused)
+    resp = client.post(f"/api/v1/admin/scans/{scan_id}/resume")
+    assert resp.status_code == 403
+
+
+def test_delete_scan_requires_admin(auth_client, user_in_db):
+    client, _ = auth_client
+    scan_id = _make_scan(user_in_db["id"])
+    resp = client.delete(f"/api/v1/admin/scans/{scan_id}")
+    assert resp.status_code == 403
+
+
 def test_pause_scan_pauses_any_users_scan(admin_client, user_in_db):
     client, _ = admin_client
     scan_id = _make_scan(user_in_db["id"], status=ScanStatus.active)
