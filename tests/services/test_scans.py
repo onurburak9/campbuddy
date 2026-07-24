@@ -262,8 +262,17 @@ def test_get_scan_admin_scope_ignores_owner(db):
     scan = Scan(user_id=u1.id, search_windows=WINDOWS)
     db.add(scan)
     db.flush()
-    result = get_scan(db, scan.id, None)
+    result = get_scan(db, scan.id, admin=True)
     assert result.id == scan.id
+
+
+def test_get_scan_requires_user_id_or_admin(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(ValueError):
+        get_scan(db, scan.id)
 
 
 def test_pause_scan_admin_scope(db):
@@ -271,7 +280,7 @@ def test_pause_scan_admin_scope(db):
     scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.active)
     db.add(scan)
     db.flush()
-    result = pause_scan(db, scan.id)
+    result = pause_scan(db, scan.id, admin=True)
     assert result.status == ScanStatus.paused
 
 
@@ -280,7 +289,7 @@ def test_resume_scan_admin_scope(db):
     scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.paused)
     db.add(scan)
     db.flush()
-    result = resume_scan(db, scan.id)
+    result = resume_scan(db, scan.id, admin=True)
     assert result.status == ScanStatus.active
 
 
@@ -289,7 +298,7 @@ def test_delete_scan_admin_scope(db):
     scan = Scan(user_id=u.id, search_windows=WINDOWS)
     db.add(scan)
     db.flush()
-    delete_scan(db, scan.id)
+    delete_scan(db, scan.id, admin=True)
     assert scan.deleted_at is not None
 
 

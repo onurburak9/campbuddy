@@ -45,9 +45,11 @@ def list_scans(db, user_id: int) -> list:
     )
 
 
-def get_scan(db, scan_id: int, user_id: Optional[int] = None) -> Scan:
+def get_scan(db, scan_id: int, user_id: Optional[int] = None, *, admin: bool = False) -> Scan:
+    if not admin and user_id is None:
+        raise ValueError("user_id is required unless admin=True")
     query = db.query(Scan).filter(Scan.id == scan_id, Scan.deleted_at.is_(None))
-    if user_id is not None:
+    if not admin:
         query = query.filter(Scan.user_id == user_id)
     scan = query.first()
     if not scan:
@@ -90,14 +92,14 @@ def update_scan(db, scan_id: int, user_id: int, data: dict) -> Scan:
     return scan
 
 
-def delete_scan(db, scan_id: int, user_id: Optional[int] = None) -> None:
-    scan = get_scan(db, scan_id, user_id)
+def delete_scan(db, scan_id: int, user_id: Optional[int] = None, *, admin: bool = False) -> None:
+    scan = get_scan(db, scan_id, user_id, admin=admin)
     scan.deleted_at = _now()
     db.flush()
 
 
-def pause_scan(db, scan_id: int, user_id: Optional[int] = None) -> Scan:
-    scan = get_scan(db, scan_id, user_id)
+def pause_scan(db, scan_id: int, user_id: Optional[int] = None, *, admin: bool = False) -> Scan:
+    scan = get_scan(db, scan_id, user_id, admin=admin)
     if scan.status != ScanStatus.active:
         raise InvalidState(
             f"Cannot pause scan with status '{scan.status.value}'; only active scans can be paused"
@@ -107,8 +109,8 @@ def pause_scan(db, scan_id: int, user_id: Optional[int] = None) -> Scan:
     return scan
 
 
-def resume_scan(db, scan_id: int, user_id: Optional[int] = None) -> Scan:
-    scan = get_scan(db, scan_id, user_id)
+def resume_scan(db, scan_id: int, user_id: Optional[int] = None, *, admin: bool = False) -> Scan:
+    scan = get_scan(db, scan_id, user_id, admin=admin)
     if scan.status != ScanStatus.paused:
         raise InvalidState(
             f"Cannot resume scan with status '{scan.status.value}'; only paused scans can be resumed"

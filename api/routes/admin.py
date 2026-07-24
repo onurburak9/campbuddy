@@ -44,14 +44,14 @@ def list_scans(db: Session = Depends(get_db_dep)):
 
 @router.post("/scans/{scan_id}/pause", response_model=ScanResponse)
 def pause_scan(scan_id: int, db: Session = Depends(get_db_dep)):
-    return scans_svc.pause_scan(db, scan_id)
+    return scans_svc.pause_scan(db, scan_id, admin=True)
 
 
 @router.post("/scans/{scan_id}/resume", response_model=ScanResponse)
 def resume_scan(scan_id: int, db: Session = Depends(get_db_dep)):
-    return scans_svc.resume_scan(db, scan_id)
+    return scans_svc.resume_scan(db, scan_id, admin=True)
 
 
 @router.delete("/scans/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_scan(scan_id: int, db: Session = Depends(get_db_dep)):
-    scans_svc.delete_scan(db, scan_id)
+    scans_svc.delete_scan(db, scan_id, admin=True)
