@@ -6,6 +6,7 @@ import { ForgotPasswordPage } from "./components/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./components/auth/ResetPasswordPage";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { SettingsPage } from "./components/settings/SettingsPage";
+import { AdminPage } from "./components/admin/AdminPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

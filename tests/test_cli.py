@@ -256,3 +256,29 @@ def test_seed_autobook_without_creds_skips_scan(tmp_path, runner, factory):
     assert result.exit_code == 0
     with factory() as db:
         assert db.query(Scan).count() == 0  # skipped: user has no rec.gov creds
+
+
+# --- promote-admin ---
+
+def test_promote_admin_grants_admin(runner, factory):
+    user_id = _seed_user(factory, "admin@e.com")
+    result = runner.invoke(cli, ["promote-admin", "admin@e.com"])
+    assert result.exit_code == 0
+    with factory() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        assert user.is_admin is True
+
+
+def test_promote_admin_revoke_flag_revokes_admin(runner, factory):
+    user_id = _seed_user(factory, "admin@e.com")
+    runner.invoke(cli, ["promote-admin", "admin@e.com"])
+    result = runner.invoke(cli, ["promote-admin", "admin@e.com", "--revoke"])
+    assert result.exit_code == 0
+    with factory() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        assert user.is_admin is False
+
+
+def test_promote_admin_unknown_email_exits_nonzero(runner, factory):
+    result = runner.invoke(cli, ["promote-admin", "ghost@e.com"])
+    assert result.exit_code == 1

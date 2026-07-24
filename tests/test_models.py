@@ -76,6 +76,13 @@ def test_scan_auto_book_defaults_false(db):
     assert scan.auto_book is False
 
 
+def test_user_is_admin_defaults_false(db):
+    user = User(email="test@example.com")
+    db.add(user)
+    db.flush()
+    assert user.is_admin is False
+
+
 def test_scan_run_always_writable(db):
     user = User(email="test@example.com")
     db.add(user)

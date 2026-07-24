@@ -2,6 +2,8 @@ export const queryKeys = {
   me: ["me"] as const,
   profile: ["profile"] as const,
   scans: ["scans"] as const,
+  adminUsers: ["admin", "users"] as const,
+  adminScans: ["admin", "scans"] as const,
   scan: (id: number) => ["scans", id] as const,
   stats: (id: number) => ["scans", id, "stats"] as const,
   runs: (id: number, page: number, pageSize: number, outcome?: string, startedAfter?: string) =>

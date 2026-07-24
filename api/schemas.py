@@ -66,6 +66,7 @@ class MeResponse(BaseModel):
     scan_limit: int
     scans_used: int
     has_telegram: bool
+    is_admin: bool
 
     class Config:
         orm_mode = True
@@ -254,3 +255,24 @@ class CampsiteResult(BaseModel):
     name: str
     loop: str
     campground_id: int
+
+
+class AdminUserResponse(BaseModel):
+    id: int
+    email: str
+    is_admin: bool
+    scan_limit: int
+    scans_used: int
+    has_telegram: bool
+    created_at: datetime
+
+
+class AdminScanResponse(BaseModel):
+    id: int
+    user_id: int
+    user_email: str
+    provider: str
+    name: Optional[str]
+    status: ScanStatus
+    polling_interval: int
+    created_at: datetime

@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from sqlalchemy import func
 from db.models import User, Scan, PasswordResetToken
 from core.services.exceptions import NotFound, InvalidState
 from core.crypto import encrypt_password
@@ -86,3 +87,21 @@ def reset_password_with_token(db, raw_token: str, hashed_password: str) -> User:
     user.hashed_password = hashed_password
     db.flush()
     return user
+
+
+def set_admin(db, email: str, is_admin: bool) -> User:
+    user = get_user_by_email(db, email)
+    user.is_admin = is_admin
+    db.flush()
+    return user
+
+
+def list_users_with_scan_counts(db) -> list[tuple[User, int]]:
+    users = db.query(User).filter(User.deleted_at.is_(None)).order_by(User.id).all()
+    counts = dict(
+        db.query(Scan.user_id, func.count(Scan.id))
+        .filter(Scan.deleted_at.is_(None))
+        .group_by(Scan.user_id)
+        .all()
+    )
+    return [(u, counts.get(u.id, 0)) for u in users]

@@ -255,3 +255,76 @@ def test_update_scan_allows_unrelated_field_on_legacy_over_limit_scan(db):
     updated = update_scan(db, scan.id, u.id, {"name": "Legacy scan"})
     assert updated.name == "Legacy scan"
     assert updated.nights == 10
+
+
+def test_get_scan_admin_scope_ignores_owner(db):
+    u1 = make_user(db, "a@e.com")
+    scan = Scan(user_id=u1.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    result = get_scan(db, scan.id, admin=True)
+    assert result.id == scan.id
+
+
+def test_get_scan_requires_user_id_or_admin(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(ValueError):
+        get_scan(db, scan.id)
+
+
+def test_pause_scan_admin_scope(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.active)
+    db.add(scan)
+    db.flush()
+    result = pause_scan(db, scan.id, admin=True)
+    assert result.status == ScanStatus.paused
+
+
+def test_resume_scan_admin_scope(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, status=ScanStatus.paused)
+    db.add(scan)
+    db.flush()
+    result = resume_scan(db, scan.id, admin=True)
+    assert result.status == ScanStatus.active
+
+
+def test_delete_scan_admin_scope(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    delete_scan(db, scan.id, admin=True)
+    assert scan.deleted_at is not None
+
+
+def test_list_all_scans_returns_scans_across_users(db):
+    u1 = make_user(db, "a@e.com")
+    u2 = make_user(db, "b@e.com")
+    db.add_all([
+        Scan(user_id=u1.id, search_windows=WINDOWS),
+        Scan(user_id=u2.id, search_windows=WINDOWS),
+    ])
+    db.flush()
+    assert len(scans_svc.list_all_scans(db)) == 2
+
+
+def test_list_all_scans_excludes_soft_deleted(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS, deleted_at=datetime.now(timezone.utc))
+    db.add(scan)
+    db.flush()
+    assert scans_svc.list_all_scans(db) == []
+
+
+def test_list_all_scans_eager_loads_owner_email(db):
+    u = make_user(db, "owner@e.com")
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    result = scans_svc.list_all_scans(db)
+    assert result[0].user.email == "owner@e.com"

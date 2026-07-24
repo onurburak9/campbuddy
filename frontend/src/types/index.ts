@@ -7,6 +7,7 @@ export interface User {
   scan_limit: number;
   scans_used: number;
   has_telegram: boolean;
+  is_admin: boolean;
 }
 
 export interface ScanStats {
@@ -106,6 +107,27 @@ export interface ProfileUpdatePayload {
   telegram_chat_id?: string;
   recreationgov_email?: string;
   recreationgov_password?: string;
+}
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  scan_limit: number;
+  scans_used: number;
+  has_telegram: boolean;
+  created_at: string;
+}
+
+export interface AdminScan {
+  id: number;
+  user_id: number;
+  user_email: string;
+  provider: string;
+  name: string | null;
+  status: ScanStatus;
+  polling_interval: number;
+  created_at: string;
 }
 
 export const PROVIDERS = [

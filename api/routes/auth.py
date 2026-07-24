@@ -90,4 +90,5 @@ def me(db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
         scan_limit=user.scan_limit,
         scans_used=scans_used(db, user.id),
         has_telegram=bool(user.telegram_chat_id),
+        is_admin=user.is_admin,
     )
