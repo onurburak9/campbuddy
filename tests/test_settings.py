@@ -98,3 +98,22 @@ def test_app_base_url_can_be_overridden(env):
     env.setenv("APP_BASE_URL", "https://campbuddy.example.com")
     s = Settings(_env_file=None)
     assert s.app_base_url == "https://campbuddy.example.com"
+
+
+def test_github_feedback_defaults(env):
+    s = Settings(_env_file=None)
+    assert s.github_token == ""
+    assert s.github_feedback_repo == "onurburak9/campbuddy"
+    assert s.feedback_notify_email == ""
+
+
+def test_github_token_loaded_from_env(env):
+    env.setenv("GITHUB_TOKEN", "ghp_test123")
+    s = Settings(_env_file=None)
+    assert s.github_token == "ghp_test123"
+
+
+def test_feedback_notify_email_loaded_from_env(env):
+    env.setenv("FEEDBACK_NOTIFY_EMAIL", "owner@example.com")
+    s = Settings(_env_file=None)
+    assert s.feedback_notify_email == "owner@example.com"
