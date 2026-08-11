@@ -1,7 +1,7 @@
 import logging
 import smtplib
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from email.mime.text import MIMEText
 
 import requests
@@ -68,6 +68,26 @@ def send_password_reset_email(to: str, reset_url: str, settings) -> None:
         server.login(settings.smtp_user, settings.smtp_password)
         server.sendmail(settings.smtp_from, to, msg.as_string())
     logger.info("Password reset email sent to %s", to)
+
+
+def send_feedback_email(to: str, page_path: str, user_email: str, message: str, settings) -> None:
+    submitted_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    body = (
+        f"Page: {page_path}\n"
+        f"From: {user_email}\n"
+        f"Submitted: {submitted_at}\n\n"
+        f"{message}\n"
+    )
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["From"] = settings.smtp_from
+    msg["To"] = to
+    msg["Subject"] = f"CampBuddy feedback from {user_email}"
+
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        server.starttls()
+        server.login(settings.smtp_user, settings.smtp_password)
+        server.sendmail(settings.smtp_from, to, msg.as_string())
+    logger.info("Feedback email sent to %s", to)
 
 
 def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:
