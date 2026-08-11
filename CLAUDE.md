@@ -89,6 +89,9 @@ main.py         — scheduler entry point
 | `COOKIE_SECURE` | no | Set `true` when serving the API over HTTPS (default: false) |
 | `REGISTRATION_ENABLED` | no | Set `false` to disable open signup via `POST /api/v1/auth/register` (default: true) |
 | `APP_BASE_URL` | no | Public base URL used to build password-reset email links (default: http://localhost:3000) |
+| `GITHUB_TOKEN` | no | Fine-grained PAT (Issues: read/write on this repo) for the feedback widget; falls back to email if unset or the API call fails |
+| `GITHUB_FEEDBACK_REPO` | no | Repo feedback issues are created in (default: onurburak9/campbuddy) |
+| `FEEDBACK_NOTIFY_EMAIL` | no | Fallback recipient for feedback if GitHub issue creation fails (default: SMTP_USER) |
 
 ## Agent rules
 

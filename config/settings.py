@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     ridb_api_key: str = ""
     registration_enabled: bool = True
     app_base_url: str = "http://localhost:3000"
+    github_token: str = ""
+    github_feedback_repo: str = "onurburak9/campbuddy"
+    feedback_notify_email: str = ""
 
     class Config:
         env_file = ".env"
