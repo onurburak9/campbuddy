@@ -218,6 +218,11 @@ class RunsCountResponse(BaseModel):
     total: int
 
 
+class FeedbackCreate(BaseModel):
+    page_path: str = Field(..., min_length=1, max_length=500)
+    message: str = Field(..., min_length=1, max_length=2000)
+
+
 class ProfileUpdate(BaseModel):
     email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
