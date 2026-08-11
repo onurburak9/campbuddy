@@ -35,5 +35,6 @@ describe("ProtectedRoute", () => {
       HttpResponse.json({ id: 1, email: "a@b.c", scan_limit: 5, scans_used: 0 })));
     renderAt("/");
     await waitFor(() => expect(screen.getByText("secret")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /feedback/i })).toBeInTheDocument();
   });
 });
