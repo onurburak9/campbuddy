@@ -1,3 +1,6 @@
+import { useAuth } from "../../contexts/AuthContext";
+import { cn } from "../../lib/cn";
+
 interface Props {
   title: string;
   onOpenSidebar?: () => void;
@@ -6,6 +9,9 @@ interface Props {
 }
 
 export function MobileTopBar({ title, onOpenSidebar, onBack, onNewScan }: Props) {
+  const { user } = useAuth();
+  const atLimit = !!user && user.scans_used >= user.scan_limit;
+
   return (
     <header className="flex h-12 items-center justify-between border-b border-sand-200 bg-white px-3 dark:border-[#222] dark:bg-[#1A1A1A] md:hidden">
       <div className="flex items-center gap-2">
@@ -29,6 +35,11 @@ export function MobileTopBar({ title, onOpenSidebar, onBack, onNewScan }: Props)
               </button>
             )}
             <h1 className="text-sm font-semibold text-stone-800 dark:text-[#EEE]">{title}</h1>
+            {user && (
+              <span className="text-xs text-stone-500 dark:text-[#888]">
+                {user.scans_used}/{user.scan_limit}
+              </span>
+            )}
           </>
         )}
       </div>
@@ -36,7 +47,12 @@ export function MobileTopBar({ title, onOpenSidebar, onBack, onNewScan }: Props)
         <button
           aria-label="New scan"
           onClick={onNewScan}
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-forest-600 text-white hover:bg-forest-700"
+          disabled={atLimit}
+          title={atLimit ? `Scan limit reached (${user?.scan_limit})` : "New scan"}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-md bg-forest-600 text-white hover:bg-forest-700",
+            atLimit && "cursor-not-allowed opacity-50 hover:bg-forest-600"
+          )}
         >
           +
         </button>
