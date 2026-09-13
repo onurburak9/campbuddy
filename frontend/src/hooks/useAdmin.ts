@@ -10,6 +10,17 @@ export function useAdminScans() {
   return useQuery({ queryKey: queryKeys.adminScans, queryFn: admin.listScans });
 }
 
+export function useAdminScan(id: number) {
+  return useQuery({ queryKey: queryKeys.adminScan(id), queryFn: () => admin.getScan(id) });
+}
+
+export function useAdminScanRuns(id: number, page: number, pageSize: number, outcome?: string, startedAfter?: string) {
+  return useQuery({
+    queryKey: queryKeys.adminScanRuns(id, page, pageSize, outcome, startedAfter),
+    queryFn: () => admin.listScanRuns(id, page, pageSize, outcome, startedAfter),
+  });
+}
+
 export function useAdminPauseScan() {
   const qc = useQueryClient();
   return useMutation({

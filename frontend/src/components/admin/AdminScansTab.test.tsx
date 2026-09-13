@@ -6,6 +6,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { server } from "../../test/server";
 import { AdminScansTab } from "./AdminScansTab";
 
+vi.mock("../../api/search", () => ({
+  search: {
+    resolveRecreationAreas: vi.fn().mockResolvedValue([]),
+    resolveCampgrounds: vi.fn().mockResolvedValue([]),
+    resolveCampsites: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 function renderTab() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}><AdminScansTab /></QueryClientProvider>);
@@ -79,5 +87,29 @@ describe("AdminScansTab", () => {
     await screen.findByText("Yosemite");
     await userEvent.click(screen.getByRole("button", { name: "Pause" }));
     expect(await screen.findByText("Action failed. Please try again.")).toBeInTheDocument();
+  });
+
+  it("expands a row to show scan detail on click and collapses on a second click", async () => {
+    server.use(
+      http.get("/api/v1/admin/scans", () => HttpResponse.json([SCAN])),
+      http.get("/api/v1/admin/scans/1", () => HttpResponse.json({
+        id: 1, user_id: 1, user_email: "user@e.com", provider: "RecreationDotGov",
+        name: "Yosemite", status: "active", polling_interval: 300,
+        rec_area_ids: null, campground_ids: null, campsite_ids: null,
+        search_windows: [], nights: 1, days_of_week: null, weekends_only: false,
+        notify_via_email: true, notify_via_telegram: false, notify_on_new_only: true,
+        created_at: "2026-01-01T00:00:00Z",
+      })),
+      http.get("/api/v1/admin/scans/1/runs", () => HttpResponse.json([])),
+    );
+    renderTab();
+    await screen.findByText("Yosemite");
+    expect(screen.queryByText("Configuration")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /expand details/i }));
+    expect(await screen.findByText("Configuration")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /collapse details/i }));
+    expect(screen.queryByText("Configuration")).not.toBeInTheDocument();
   });
 });

@@ -4,6 +4,9 @@ export const queryKeys = {
   scans: ["scans"] as const,
   adminUsers: ["admin", "users"] as const,
   adminScans: ["admin", "scans"] as const,
+  adminScan: (id: number) => ["admin", "scans", id] as const,
+  adminScanRuns: (id: number, page: number, pageSize: number, outcome?: string, startedAfter?: string) =>
+    ["admin", "scans", id, "runs", { page, pageSize, outcome: outcome ?? null, startedAfter: startedAfter ?? null }] as const,
   scan: (id: number) => ["scans", id] as const,
   stats: (id: number) => ["scans", id, "stats"] as const,
   runs: (id: number, page: number, pageSize: number, outcome?: string, startedAfter?: string) =>

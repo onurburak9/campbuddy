@@ -134,6 +134,10 @@ export interface AdminScan {
   created_at: string;
 }
 
+export interface AdminScanDetail extends Scan {
+  user_email: string;
+}
+
 export const PROVIDERS = [
   "RecreationDotGov", "Yellowstone", "GoingToCamp", "ReserveCalifornia",
   "AlabamaStateParks", "ArizonaStateParks", "FloridaStateParks",

@@ -1,10 +1,19 @@
-from typing import List
-from fastapi import APIRouter, Depends, status
+from datetime import datetime
+from typing import List, Optional
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from api.deps import get_db_dep, get_current_admin
-from api.schemas import AdminUserResponse, AdminScanResponse, ScanResponse
+from api.schemas import (
+    AdminUserResponse,
+    AdminScanResponse,
+    AdminScanDetailResponse,
+    ScanResponse,
+    ScanRunResponse,
+)
 from core.services import users as users_svc
 from core.services import scans as scans_svc
+from core.services import history as history_svc
+from db.models import ScanOutcome
 
 router = APIRouter(dependencies=[Depends(get_current_admin)])
 
@@ -40,6 +49,27 @@ def list_scans(db: Session = Depends(get_db_dep)):
         )
         for s in scans_svc.list_all_scans(db)
     ]
+
+
+@router.get("/scans/{scan_id}", response_model=AdminScanDetailResponse)
+def get_scan_detail(scan_id: int, db: Session = Depends(get_db_dep)):
+    scan = scans_svc.get_scan(db, scan_id, admin=True)
+    return AdminScanDetailResponse(**ScanResponse.from_orm(scan).dict(), user_email=scan.user.email)
+
+
+@router.get("/scans/{scan_id}/runs", response_model=List[ScanRunResponse])
+def list_scan_runs(
+    scan_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    outcome: Optional[ScanOutcome] = Query(default=None),
+    started_after: Optional[datetime] = Query(default=None),
+    db: Session = Depends(get_db_dep),
+):
+    return history_svc.list_runs(
+        db, scan_id, page=page, page_size=page_size,
+        outcome=outcome, started_after=started_after, admin=True,
+    )
 
 
 @router.post("/scans/{scan_id}/pause", response_model=ScanResponse)
