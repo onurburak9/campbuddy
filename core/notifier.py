@@ -20,12 +20,19 @@ class NotificationPayload:
     booking_url: str
     cart_added: bool
     nights: int
+    recreation_area: Optional[str] = None
 
 
 def _format_dates(p: NotificationPayload) -> str:
     start = f"{p.booking_date.strftime('%b')} {p.booking_date.day}"
     end = f"{p.booking_end_date.strftime('%b')} {p.booking_end_date.day}"
     return f"{start} - {end}"
+
+
+def _location_label(p: NotificationPayload) -> str:
+    if p.recreation_area and p.recreation_area != p.facility_name:
+        return f"{p.facility_name}, {p.recreation_area}"
+    return p.facility_name
 
 
 def send_email(to: str, payload: NotificationPayload, settings) -> None:
@@ -36,7 +43,7 @@ def send_email(to: str, payload: NotificationPayload, settings) -> None:
         else "Could not add to cart automatically - book manually now"
     )
     body = (
-        f"Site:   {payload.facility_name} - Site {payload.site_name} ({payload.campsite_type})\n"
+        f"Site:   {_location_label(payload)} - Site {payload.site_name} ({payload.campsite_type})\n"
         f"Dates:  {dates} ({payload.nights} nights)\n"
         f"Status: {cart_line}\n\n"
         f"Book here: {payload.booking_url}\n"
@@ -44,7 +51,7 @@ def send_email(to: str, payload: NotificationPayload, settings) -> None:
     msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = settings.smtp_from
     msg["To"] = to
-    msg["Subject"] = f"Campsite available - {payload.facility_name} [{dates}]"
+    msg["Subject"] = f"Campsite available - {_location_label(payload)} [{dates}]"
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
         server.starttls()
@@ -129,7 +136,7 @@ def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:
     )
     text = (
         f"🏕 Campsite available!\n"
-        f"{payload.facility_name} — Site {payload.site_name}\n"
+        f"{_location_label(payload)} — Site {payload.site_name}\n"
         f"{dates} ({payload.nights} nights) · {payload.campsite_type}\n\n"
         f"{cart_line}\n"
         f"🔗 {payload.booking_url}"
@@ -143,7 +150,7 @@ def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:
 def _digest_subject(payloads: list[NotificationPayload]) -> str:
     n = len(payloads)
     facilities = list(dict.fromkeys(p.facility_name for p in payloads))
-    header = facilities[0] if len(facilities) == 1 else f"{len(facilities)} campgrounds"
+    header = _location_label(payloads[0]) if len(facilities) == 1 else f"{len(facilities)} campgrounds"
     noun = "site" if n == 1 else "sites"
     subject = f"{n} {noun} available — {header}"
 
@@ -168,7 +175,7 @@ def _digest_body(payloads: list[NotificationPayload]) -> str:
 
     for facility, group in by_facility.items():
         lines.append("")
-        lines.append(facility)
+        lines.append(_location_label(group[0]))
         for p in group:
             prefix = "[IN CART - book within 15 min] " if p.cart_added else ""
             dates = _format_dates(p)
@@ -231,7 +238,7 @@ def _telegram_digest_body(payloads: list[NotificationPayload]) -> str:
 
     all_lines: list[str] = [header, ""]
     for facility, group in by_facility.items():
-        all_lines.append(facility)
+        all_lines.append(_location_label(group[0]))
         for p in group:
             prefix = "  ✅ " if p.cart_added else "  "
             all_lines.append(f"{prefix}Site {p.site_name} — {p.booking_url}")
@@ -278,7 +285,7 @@ def _available_subject(payloads: list[NotificationPayload]) -> str:
     n = len(payloads)
     noun = "site" if n == 1 else "sites"
     facilities = list(dict.fromkeys(p.facility_name for p in payloads))
-    header = facilities[0] if len(facilities) == 1 else f"{len(facilities)} campgrounds"
+    header = _location_label(payloads[0]) if len(facilities) == 1 else f"{len(facilities)} campgrounds"
     return f"{n} {noun} available — {header}"
 
 
@@ -290,7 +297,7 @@ def _available_body(payloads: list[NotificationPayload], auto_book: bool) -> str
         by_facility.setdefault(p.facility_name, []).append(p)
     for facility, group in by_facility.items():
         lines.append("")
-        lines.append(facility)
+        lines.append(_location_label(group[0]))
         for p in group:
             lines.append(f"  Site {p.site_name} ({p.campsite_type})  {_format_dates(p)}  {p.booking_url}")
     if auto_book:

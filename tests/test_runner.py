@@ -105,6 +105,14 @@ def test_run_saves_result_and_marks_cart_when_autobook_on(factory, scan_id, sett
     mock_notify_available.assert_called_once()
 
 
+def test_run_passes_recreation_area_to_notification_payload(factory, scan_id, settings, mocker):
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mock_notify_available = mocker.patch("core.runner.notify_available")
+    run_scan(scan_id, factory, settings)
+    payloads = mock_notify_available.call_args.args[1]
+    assert payloads[0].recreation_area == "Yosemite National Park"
+
+
 def test_dedup_skips_same_site_same_date(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
     mock_notify_available = mocker.patch("core.runner.notify_available")

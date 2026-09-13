@@ -216,6 +216,7 @@ def test_notify(scan_id: int):
             booking_url="https://www.recreation.gov/camping/campsites/99999",
             cart_added=False,
             nights=3,
+            recreation_area="TEST — Yosemite National Park",
         )
         notify_available(scan, [payload], settings)
     click.echo("Test notification sent.")
