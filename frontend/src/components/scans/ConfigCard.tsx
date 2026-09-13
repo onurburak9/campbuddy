@@ -92,8 +92,17 @@ export function ConfigCard({ scan }: { scan: Scan }) {
         <Row label="Search windows">
           <span className="flex flex-wrap gap-1.5">
             {scan.search_windows.map((w, i) => (
-              <span key={i} className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs text-stone-600 dark:bg-[#222] dark:text-[#AAA]">
+              <span
+                key={i}
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-xs",
+                  w.expired
+                    ? "line-through bg-sand-50 text-stone-400 dark:bg-[#1A1A1A] dark:text-[#666]"
+                    : "bg-sand-100 text-stone-600 dark:bg-[#222] dark:text-[#AAA]",
+                )}
+              >
                 {dateRange(w.start_date, w.end_date)}
+                {w.expired && <span className="ml-1 no-underline">expired</span>}
               </span>
             ))}
           </span>

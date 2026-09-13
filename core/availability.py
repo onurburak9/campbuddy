@@ -11,6 +11,14 @@ PROVIDER_MAP = {
 }
 
 
+def _is_expired(window: dict) -> bool:
+    return date.fromisoformat(window["end_date"]) < date.today()
+
+
+def active_windows(search_windows: list[dict]) -> list[dict]:
+    return [w for w in search_windows if not _is_expired(w)]
+
+
 def check_availability(scan) -> list:
     cls = PROVIDER_MAP.get(scan.provider)
     if cls is None:
@@ -22,12 +30,16 @@ def check_availability(scan) -> list:
             "rec_area_ids, campground_ids, or campsite_ids is required"
         )
 
+    windows_data = active_windows(scan.search_windows)
+    if not windows_data:
+        return []
+
     windows = [
         SearchWindow(
             start_date=date.fromisoformat(w["start_date"]),
             end_date=date.fromisoformat(w["end_date"]),
         )
-        for w in scan.search_windows
+        for w in windows_data
     ]
 
     kwargs = dict(search_window=windows, nights=scan.nights, weekends_only=scan.weekends_only)

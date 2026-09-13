@@ -3,6 +3,7 @@ import smtplib
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from email.mime.text import MIMEText
+from typing import Optional
 
 import requests
 
@@ -88,6 +89,32 @@ def send_feedback_email(to: str, page_path: str, user_email: str, message: str, 
         server.login(settings.smtp_user, settings.smtp_password)
         server.sendmail(settings.smtp_from, to, msg.as_string())
     logger.info("Feedback email sent to %s", to)
+
+
+def send_scan_stopped_email(to: str, scan_name: Optional[str], settings) -> None:
+    label = scan_name or "Your scan"
+    body = (
+        f"{label} has been stopped because all of its preferred search windows are now in the past.\n\n"
+        "Edit the scan with new dates and reactivate it to keep searching.\n"
+    )
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["From"] = settings.smtp_from
+    msg["To"] = to
+    msg["Subject"] = f"{label}: no upcoming dates left"
+
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        server.starttls()
+        server.login(settings.smtp_user, settings.smtp_password)
+        server.sendmail(settings.smtp_from, to, msg.as_string())
+    logger.info("Scan-stopped email sent to %s", to)
+
+
+def notify_scan_stopped(scan, settings) -> None:
+    if scan.notify_via_email and scan.user.email:
+        try:
+            send_scan_stopped_email(scan.user.email, scan.name, settings)
+        except Exception as e:
+            logger.error("Scan-stopped email failed: %s", e)
 
 
 def send_telegram(chat_id: str, payload: NotificationPayload, settings) -> None:

@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timedelta, timezone
 from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -22,6 +22,10 @@ def settings():
     return s
 
 
+FUTURE_START = (date.today() + timedelta(days=30)).isoformat()
+FUTURE_END = (date.today() + timedelta(days=33)).isoformat()
+
+
 @pytest.fixture
 def scan_id(factory):
     with factory() as db:
@@ -34,7 +38,7 @@ def scan_id(factory):
         db.flush()
         scan = Scan(
             user_id=user.id,
-            search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
+            search_windows=[{"start_date": FUTURE_START, "end_date": FUTURE_END}],
             rec_area_ids=[1076],
             nights=3,
             polling_interval=300,
@@ -312,3 +316,51 @@ def test_run_persists_facility_and_area_identifiers(factory, scan_id, settings, 
         assert r.facility_id == "232447"
         assert r.recreation_area_id == "2991"
         assert r.recreation_area == "Yosemite National Park"
+
+
+PAST_WINDOW = [{
+    "start_date": (date.today() - timedelta(days=10)).isoformat(),
+    "end_date": (date.today() - timedelta(days=5)).isoformat(),
+}]
+
+
+def test_run_stops_scan_and_notifies_when_all_windows_expired(factory, scan_id, settings, mocker):
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"search_windows": PAST_WINDOW})
+        db.commit()
+    mock_avail = mocker.patch("core.runner.check_availability")
+    mock_notify_stopped = mocker.patch("core.runner.notify_scan_stopped")
+
+    run_scan(scan_id, factory, settings)
+
+    mock_avail.assert_not_called()
+    mock_notify_stopped.assert_called_once()
+    with factory() as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        assert scan.status == "completed"
+        run = db.query(ScanRun).filter(ScanRun.scan_id == scan_id).first()
+        assert run.outcome == "no_results"
+        assert run.sites_found == 0
+        assert run.finished_at is not None
+
+
+def test_run_continues_when_at_least_one_window_still_active(factory, scan_id, settings, mocker):
+    future_window = {
+        "start_date": (date.today() + timedelta(days=30)).isoformat(),
+        "end_date": (date.today() + timedelta(days=33)).isoformat(),
+    }
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update(
+            {"search_windows": PAST_WINDOW + [future_window]}
+        )
+        db.commit()
+    mock_avail = mocker.patch("core.runner.check_availability", return_value=[])
+    mock_notify_stopped = mocker.patch("core.runner.notify_scan_stopped")
+
+    run_scan(scan_id, factory, settings)
+
+    mock_avail.assert_called_once()
+    mock_notify_stopped.assert_not_called()
+    with factory() as db:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        assert scan.status == "active"

@@ -16,7 +16,7 @@ import type { Scan } from "../../types/index";
 const scan4: Scan = {
   id: 4, user_id: 1, provider: "RecreationDotGov", name: "Sequioa", status: "active",
   polling_interval: 600, rec_area_ids: [2931], campground_ids: null, campsite_ids: null,
-  search_windows: [{ start_date: "2026-07-01", end_date: "2026-07-03" }], nights: 2,
+  search_windows: [{ start_date: "2026-07-01", end_date: "2026-07-03", expired: false }], nights: 2,
   days_of_week: null, weekends_only: false, notify_via_email: true,
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 };
@@ -24,7 +24,7 @@ const scan4: Scan = {
 const scan5: Scan = {
   id: 5, user_id: 1, provider: "RecreationDotGov", name: "Jul Trip", status: "active",
   polling_interval: 600, rec_area_ids: null, campground_ids: [111], campsite_ids: null,
-  search_windows: [{ start_date: "2026-07-10", end_date: "2026-07-12" }], nights: 2,
+  search_windows: [{ start_date: "2026-07-10", end_date: "2026-07-12", expired: false }], nights: 2,
   days_of_week: null, weekends_only: false, notify_via_email: true,
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 };
