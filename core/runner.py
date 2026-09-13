@@ -3,12 +3,17 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import joinedload
 
-from db.models import Scan, ScanRun, ScanResult
+from db.models import Scan, ScanRun, ScanResult, ScanStatus
 from db.session import get_db
-from core.availability import check_availability
+from core.availability import active_windows, check_availability
 from core.booking import attempt_cart_add_batch, sidecar_healthy
 from core.crypto import decrypt_password
-from core.notifier import notify_available, notify_cart_results, NotificationPayload
+from core.notifier import (
+    notify_available,
+    notify_cart_results,
+    notify_scan_stopped,
+    NotificationPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,17 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         db.add(run)
         db.flush()
         run_id = run.id
+
+        if not active_windows(scan.search_windows):
+            run.outcome = "no_results"
+            run.sites_found = 0
+            run.finished_at = _now()
+            scan.status = ScanStatus.completed
+            db.flush()
+            db.expunge_all()
+            notify_scan_stopped(scan, settings)
+            return
+
         db.expunge_all()
 
     user = scan.user

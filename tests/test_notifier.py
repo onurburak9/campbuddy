@@ -10,10 +10,12 @@ from core.notifier import (
     _available_body,
     notify_available,
     notify_cart_results,
+    notify_scan_stopped,
     send_email,
     send_email_digest,
     send_feedback_email,
     send_password_reset_email,
+    send_scan_stopped_email,
     send_telegram,
     send_telegram_digest,
 )
@@ -476,3 +478,45 @@ def test_notify_cart_results_noop_when_empty(mocker):
     mock_tg_avail.assert_not_called()
     mock_email_digest.assert_not_called()
     mock_tg_digest.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Scan-stopped notification (all preferred windows in the past)
+# ---------------------------------------------------------------------------
+
+
+def test_scan_stopped_email_explains_reason(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_scan_stopped_email("to@example.com", "Yosemite trip", make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "Yosemite trip" in body
+    assert "past" in body.lower()
+
+
+def test_scan_stopped_email_uses_generic_label_when_scan_unnamed(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_scan_stopped_email("to@example.com", None, make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "Your scan" in body
+
+
+def test_notify_scan_stopped_sends_email_when_enabled(mocker):
+    send = mocker.patch("core.notifier.send_scan_stopped_email")
+    scan = _scan(email=True)
+    scan.name = "Yosemite trip"
+    notify_scan_stopped(scan, MagicMock())
+    send.assert_called_once_with("u@e.com", "Yosemite trip", mocker.ANY)
+
+
+def test_notify_scan_stopped_skips_when_email_disabled(mocker):
+    send = mocker.patch("core.notifier.send_scan_stopped_email")
+    notify_scan_stopped(_scan(email=False), MagicMock())
+    send.assert_not_called()
+
+
+def test_notify_scan_stopped_swallows_send_error(mocker):
+    mocker.patch("core.notifier.send_scan_stopped_email", side_effect=RuntimeError("smtp down"))
+    # must not raise
+    notify_scan_stopped(_scan(email=True), MagicMock())

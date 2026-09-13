@@ -163,6 +163,12 @@ class ScanResponse(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("search_windows", each_item=True)
+    def flag_expired_windows(cls, w):
+        w = dict(w)
+        w["expired"] = date.fromisoformat(str(w["end_date"])) < date.today()
+        return w
+
 
 class ScanRunResponse(BaseModel):
     id: int

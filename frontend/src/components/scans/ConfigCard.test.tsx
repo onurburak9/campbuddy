@@ -22,7 +22,7 @@ function wrap(ui: ReactNode) {
 const scan: Scan = {
   id: 5, user_id: 1, provider: "RecreationDotGov", name: "Trip", status: "active",
   polling_interval: 600, rec_area_ids: null, campground_ids: [10357105, 10357111],
-  campsite_ids: null, search_windows: [{ start_date: "2026-07-03", end_date: "2026-07-05" }],
+  campsite_ids: null, search_windows: [{ start_date: "2026-07-03", end_date: "2026-07-05", expired: false }],
   nights: 2, days_of_week: [4, 5], weekends_only: false, notify_via_email: true,
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 };
@@ -114,5 +114,21 @@ describe("ConfigCard", () => {
     expect(
       screen.getByText("Monitoring 1 campground across 1 recreation area across 1 campsite"),
     ).toBeInTheDocument();
+  });
+
+  it("visually distinguishes expired search windows from active ones", () => {
+    const scanWithExpiredWindow: Scan = {
+      ...scan,
+      search_windows: [
+        { start_date: "2026-01-03", end_date: "2026-01-05", expired: true },
+        { start_date: "2026-12-03", end_date: "2026-12-05", expired: false },
+      ],
+    };
+    wrap(<ConfigCard scan={scanWithExpiredWindow} />);
+    const expiredChip = screen.getByText("Jan 3 – Jan 5").closest("span");
+    const activeChip = screen.getByText("Dec 3 – Dec 5").closest("span");
+    expect(expiredChip).toHaveClass("line-through");
+    expect(activeChip).not.toHaveClass("line-through");
+    expect(screen.getByText("expired")).toBeInTheDocument();
   });
 });

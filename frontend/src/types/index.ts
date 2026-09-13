@@ -25,6 +25,10 @@ export interface SearchWindow {
   end_date: string;
 }
 
+export interface ScanSearchWindow extends SearchWindow {
+  expired: boolean;
+}
+
 export interface Scan {
   id: number;
   user_id: number;
@@ -35,7 +39,7 @@ export interface Scan {
   rec_area_ids: number[] | null;
   campground_ids: number[] | null;
   campsite_ids: number[] | null;
-  search_windows: SearchWindow[];
+  search_windows: ScanSearchWindow[];
   nights: number;
   days_of_week: number[] | null;
   weekends_only: boolean;

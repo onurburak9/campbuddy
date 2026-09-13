@@ -100,3 +100,36 @@ def test_no_targeting_ids_raises():
         check_availability(make_scan(
             rec_area_ids=None, campground_ids=None, campsite_ids=None
         ))
+
+
+PAST_START = date.today() - timedelta(days=10)
+PAST_END = date.today() - timedelta(days=5)
+
+
+def test_expired_windows_excluded_from_search(mocker):
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = []
+    mock_cls = MagicMock(return_value=mock_search)
+    patch_provider(mocker, mock_cls)
+
+    scan = make_scan(search_windows=[
+        {"start_date": PAST_START.isoformat(), "end_date": PAST_END.isoformat()},
+        {"start_date": FUTURE_START.isoformat(), "end_date": FUTURE_END.isoformat()},
+    ])
+    check_availability(scan)
+
+    windows = mock_cls.call_args.kwargs["search_window"]
+    assert len(windows) == 1
+    assert windows[0].start_date == FUTURE_START
+
+
+def test_returns_empty_without_calling_provider_when_all_windows_expired(mocker):
+    mock_cls = MagicMock()
+    patch_provider(mocker, mock_cls)
+
+    scan = make_scan(search_windows=[
+        {"start_date": PAST_START.isoformat(), "end_date": PAST_END.isoformat()},
+    ])
+
+    assert check_availability(scan) == []
+    mock_cls.assert_not_called()

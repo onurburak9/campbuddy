@@ -1,6 +1,6 @@
 """End-to-end: real SQLite, all external I/O mocked."""
 import pytest
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timedelta, timezone
 from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,6 +8,9 @@ from cryptography.fernet import Fernet
 from db.models import Base, User, Scan, ScanRun, ScanResult
 from core.runner import run_scan
 from core.crypto import encrypt_password
+
+FUTURE_START = (date.today() + timedelta(days=30)).isoformat()
+FUTURE_END = (date.today() + timedelta(days=33)).isoformat()
 
 
 @pytest.fixture
@@ -41,7 +44,7 @@ def seed(factory, fernet_key):
         db.flush()
         scan = Scan(
             user_id=user.id,
-            search_windows=[{"start_date": "2026-07-03", "end_date": "2026-07-06"}],
+            search_windows=[{"start_date": FUTURE_START, "end_date": FUTURE_END}],
             rec_area_ids=[1076],
             nights=3,
             polling_interval=300,
