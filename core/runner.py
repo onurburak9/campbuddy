@@ -109,6 +109,7 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
                 campsite_type=site.campsite_type, booking_date=booking_date,
                 booking_end_date=booking_end_date, booking_url=site.booking_url,
                 cart_added=False, nights=scan.nights,
+                recreation_area=site.recreation_area,
             )
             new_items.append((
                 result.id, payload,

@@ -8,6 +8,7 @@ import pytest
 from core.notifier import (
     NotificationPayload,
     _available_body,
+    _available_subject,
     notify_available,
     notify_cart_results,
     notify_scan_stopped,
@@ -43,7 +44,7 @@ def make_settings(**overrides):
     return s
 
 
-def make_payload(cart_added=True):
+def make_payload(cart_added=True, recreation_area=None):
     return NotificationPayload(
         facility_name="Union West",
         site_name="1",
@@ -53,6 +54,7 @@ def make_payload(cart_added=True):
         booking_url="https://www.recreation.gov/camping/campsites/10357088",
         cart_added=cart_added,
         nights=3,
+        recreation_area=recreation_area,
     )
 
 
@@ -63,6 +65,34 @@ def test_email_contains_booking_url_and_cart_status(mocker):
     body = _decode_email_body(instance.sendmail.call_args[0][2])
     assert "https://www.recreation.gov/camping/campsites/10357088" in body
     assert "Added to cart" in body
+
+
+def test_email_includes_recreation_area_alongside_facility_name(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payload = make_payload(recreation_area="Yosemite National Park")
+    send_email("to@example.com", payload, make_settings())
+    raw = instance.sendmail.call_args[0][2]
+    body = _decode_email_body(raw)
+    assert "Union West, Yosemite National Park" in body
+    assert "Union West, Yosemite National Park" in _decode_subject(raw)
+
+
+def test_email_omits_recreation_area_when_absent(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_email("to@example.com", make_payload(recreation_area=None), make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "Union West" in body
+    assert "," not in body.splitlines()[0]
+
+
+def test_email_omits_recreation_area_when_same_as_facility_name(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    send_email("to@example.com", make_payload(recreation_area="Union West"), make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "Union West, Union West" not in body
 
 
 def test_password_reset_email_contains_reset_url(mocker):
@@ -124,6 +154,15 @@ def test_telegram_contains_booking_url(mocker):
     assert "Union West" in text
 
 
+def test_telegram_includes_recreation_area(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = True
+    payload = make_payload(recreation_area="Yosemite National Park")
+    send_telegram("123456", payload, make_settings())
+    text = mock_post.call_args[1]["json"]["text"]
+    assert "Union West, Yosemite National Park" in text
+
+
 def test_telegram_skips_when_no_token(mocker):
     mock_post = mocker.patch("core.notifier.requests.post")
     send_telegram("123456", make_payload(), make_settings(telegram_bot_token=""))
@@ -149,6 +188,7 @@ def make_payload_at(
     check_in=date(2026, 7, 16),
     check_out=date(2026, 7, 18),
     cart_added=False,
+    recreation_area=None,
 ):
     return NotificationPayload(
         facility_name=facility,
@@ -159,6 +199,7 @@ def make_payload_at(
         booking_url=f"https://www.recreation.gov/camping/campsites/{site}",
         cart_added=cart_added,
         nights=2,
+        recreation_area=recreation_area,
     )
 
 
@@ -169,6 +210,28 @@ def test_digest_email_subject_single_facility(mocker):
     send_email_digest("to@example.com", payloads, make_settings())
     raw = instance.sendmail.call_args[0][2]
     assert _decode_subject(raw) == "21 sites available — Chilkoot [Jul 16-18]"
+
+
+def test_digest_email_subject_includes_recreation_area(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payloads = [make_payload_at(recreation_area="Chugach National Forest")]
+    send_email_digest("to@example.com", payloads, make_settings())
+    raw = instance.sendmail.call_args[0][2]
+    assert "Chilkoot, Chugach National Forest" in _decode_subject(raw)
+
+
+def test_digest_email_body_includes_recreation_area_per_group(mocker):
+    mock_smtp = mocker.patch("core.notifier.smtplib.SMTP")
+    instance = mock_smtp.return_value.__enter__.return_value
+    payloads = [
+        make_payload_at(facility="Chilkoot", site="10", recreation_area="Chugach National Forest"),
+        make_payload_at(facility="Forks", site="99", recreation_area="Olympic National Park"),
+    ]
+    send_email_digest("to@example.com", payloads, make_settings())
+    body = _decode_email_body(instance.sendmail.call_args[0][2])
+    assert "Chilkoot, Chugach National Forest" in body
+    assert "Forks, Olympic National Park" in body
 
 
 def test_digest_email_subject_multiple_facilities(mocker):
@@ -297,6 +360,15 @@ def test_digest_telegram_lists_all_sites(mocker):
     assert "Forks" in text
     assert "https://www.recreation.gov/camping/campsites/23" in text
     assert "https://www.recreation.gov/camping/campsites/5" in text
+
+
+def test_digest_telegram_includes_recreation_area(mocker):
+    mock_post = mocker.patch("core.notifier.requests.post")
+    mock_post.return_value.ok = True
+    payloads = [make_payload_at(recreation_area="Chugach National Forest")]
+    send_telegram_digest("123456", payloads, make_settings())
+    text = mock_post.call_args[1]["json"]["text"]
+    assert "Chilkoot, Chugach National Forest" in text
 
 
 def test_digest_telegram_skips_when_no_token(mocker):
@@ -448,6 +520,28 @@ def test_notify_cart_results_unavailable_swallows_send_error(mocker):
     notify_cart_results(
         _scan(email=True, telegram=True), [_payload()], MagicMock(), sidecar_available=False
     )
+
+
+def test_available_subject_includes_recreation_area():
+    payload = NotificationPayload(
+        facility_name="Big Meadow", site_name="07", campsite_type="STANDARD",
+        booking_date=date(2026, 7, 11), booking_end_date=date(2026, 7, 13),
+        booking_url="https://rec.gov/1", cart_added=False, nights=2,
+        recreation_area="Shenandoah National Park",
+    )
+    subject = _available_subject([payload])
+    assert "Big Meadow, Shenandoah National Park" in subject
+
+
+def test_available_body_includes_recreation_area_per_group():
+    payload = NotificationPayload(
+        facility_name="Big Meadow", site_name="07", campsite_type="STANDARD",
+        booking_date=date(2026, 7, 11), booking_end_date=date(2026, 7, 13),
+        booking_url="https://rec.gov/1", cart_added=False, nights=2,
+        recreation_area="Shenandoah National Park",
+    )
+    body = _available_body([payload], auto_book=False)
+    assert "Big Meadow, Shenandoah National Park" in body
 
 
 def test_available_body_contains_auto_book_followup_line():
