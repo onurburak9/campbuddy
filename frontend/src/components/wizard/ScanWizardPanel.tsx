@@ -34,6 +34,7 @@ export function ScanWizardPanel({ onClose, onCreated }: {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const atLimit = !!user && user.scans_used >= user.scan_limit;
 
   useEffect(() => {
     if (hasSeenWizardTour()) return;
@@ -85,6 +86,11 @@ export function ScanWizardPanel({ onClose, onCreated }: {
           {step === 0 && <ProviderSitesFields state={form.state} set={form.set} />}
           {step === 1 && <DatesFiltersFields state={form.state} set={form.set} />}
           {step === 2 && <NotificationsFields state={form.state} set={form.set} telegramAvailable={!!user?.has_telegram} />}
+          {step === 2 && atLimit && (
+            <p className="mt-4 text-sm text-[#DC2626]">
+              You've reached your scan limit ({user?.scans_used} / {user?.scan_limit}). Delete an existing scan to create a new one.
+            </p>
+          )}
           {error && <p className="mt-4 text-sm text-[#DC2626]">{error}</p>}
         </div>
         <div className="mt-6 flex justify-between border-t border-sand-200 pt-4 dark:border-[#222]">
@@ -93,7 +99,7 @@ export function ScanWizardPanel({ onClose, onCreated }: {
             {step > 0 && <Button variant="secondary" onClick={() => setStep((s) => s - 1)}>Back</Button>}
             {step < 2
               ? <Button onClick={next}>Next →</Button>
-              : <Button onClick={onCreate} disabled={create.isPending}>
+              : <Button onClick={onCreate} disabled={create.isPending || atLimit} title={atLimit ? "Scan limit reached" : undefined}>
                   {create.isPending ? "Creating…" : "Create Scan"}
                 </Button>}
           </div>

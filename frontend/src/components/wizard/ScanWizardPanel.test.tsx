@@ -5,7 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { server } from "../../test/server";
 
-vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, email: "a@b.c", has_telegram: true } }) }));
+const mockUser = vi.fn((): { id: number; email: string; has_telegram: boolean; scan_limit: number; scans_used: number } => ({
+  id: 1, email: "a@b.c", has_telegram: true, scan_limit: 5, scans_used: 1,
+}));
+vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ user: mockUser() }) }));
 vi.mock("../../lib/tour");
 
 import { ScanWizardPanel } from "./ScanWizardPanel";
@@ -28,6 +31,7 @@ describe("ScanWizardPanel", () => {
         HttpResponse.json([{ id: 2991, name: "Yosemite" }])
       )
     );
+    mockUser.mockReturnValue({ id: 1, email: "a@b.c", has_telegram: true, scan_limit: 5, scans_used: 1 });
   });
 
   it("walks through the steps and creates a scan", async () => {
@@ -53,6 +57,23 @@ describe("ScanWizardPanel", () => {
     // Step 3 — create
     await userEvent.click(screen.getByRole("button", { name: /create scan/i }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
+  });
+
+  it("disables Create Scan and shows a message when the user is at their scan limit", async () => {
+    mockUser.mockReturnValue({ id: 1, email: "a@b.c", has_telegram: true, scan_limit: 5, scans_used: 5 });
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add window/i }));
+    const dates = screen.getAllByDisplayValue("");
+    await userEvent.type(dates[0], "2026-07-01");
+    await userEvent.type(dates[1], "2026-07-03");
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(screen.getByText(/reached your scan limit/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create scan/i })).toBeDisabled();
   });
 
   it("shows a compact mobile step indicator that advances", async () => {

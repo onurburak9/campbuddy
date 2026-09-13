@@ -3,6 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
+vi.mock("../../contexts/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 1, email: "a@b.c", scan_limit: 5, scans_used: 0, has_telegram: true } }),
+}));
 vi.mock("./IconSidebar", () => ({ IconSidebar: () => <div data-testid="sidebar" /> }));
 vi.mock("./ScanListPanel", () => ({
   ScanListPanel: ({ onSelect, onNewScan }: { onSelect: (id: number) => void; onNewScan: () => void }) => (
