@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from db.models import ScanRun, ScanResult, ScanOutcome, ScanStatus
 from core.services.scans import get_scan
 from core.services.exceptions import NotFound
@@ -17,8 +18,11 @@ def _filtered_runs_query(db, scan_id: int, outcome=None, started_after=None):
     return q
 
 
-def list_runs(db, scan_id: int, user_id: int, page: int = 1, page_size: int = 20, outcome=None, started_after=None) -> list:
-    get_scan(db, scan_id, user_id)
+def list_runs(
+    db, scan_id: int, user_id: Optional[int] = None, page: int = 1, page_size: int = 20,
+    outcome=None, started_after=None, *, admin: bool = False,
+) -> list:
+    get_scan(db, scan_id, user_id, admin=admin)
     q = _filtered_runs_query(db, scan_id, outcome, started_after)
     return (
         q.order_by(ScanRun.started_at.desc())

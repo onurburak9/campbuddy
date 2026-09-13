@@ -287,3 +287,7 @@ class AdminScanResponse(BaseModel):
     status: ScanStatus
     polling_interval: int
     created_at: datetime
+
+
+class AdminScanDetailResponse(ScanResponse):
+    user_email: str

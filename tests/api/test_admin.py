@@ -103,3 +103,56 @@ def test_pause_missing_scan_returns_404(admin_client):
     client, _ = admin_client
     resp = client.post("/api/v1/admin/scans/9999/pause")
     assert resp.status_code == 404
+
+
+def test_get_scan_detail_requires_admin(auth_client, user_in_db):
+    client, _ = auth_client
+    scan_id = _make_scan(user_in_db["id"])
+    resp = client.get(f"/api/v1/admin/scans/{scan_id}")
+    assert resp.status_code == 403
+
+
+def test_get_scan_detail_returns_full_config_and_owner_email(admin_client, user_in_db):
+    client, _ = admin_client
+    scan_id = _make_scan(user_in_db["id"], name="Yosemite trip", nights=2)
+    resp = client.get(f"/api/v1/admin/scans/{scan_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == scan_id
+    assert data["user_email"] == "user@example.com"
+    assert data["name"] == "Yosemite trip"
+    assert data["nights"] == 2
+    assert data["search_windows"] == [{**WINDOWS[0], "expired": True}]
+
+
+def test_get_scan_detail_returns_404_for_missing_scan(admin_client):
+    client, _ = admin_client
+    resp = client.get("/api/v1/admin/scans/9999")
+    assert resp.status_code == 404
+
+
+def test_list_scan_runs_requires_admin(auth_client, user_in_db):
+    client, _ = auth_client
+    scan_id = _make_scan(user_in_db["id"])
+    resp = client.get(f"/api/v1/admin/scans/{scan_id}/runs")
+    assert resp.status_code == 403
+
+
+def test_list_scan_runs_returns_runs_for_any_users_scan(admin_client, scan_with_runs):
+    client, _ = admin_client
+    resp = client.get(f"/api/v1/admin/scans/{scan_with_runs.id}/runs")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 3
+
+
+def test_list_scan_runs_respects_page_size(admin_client, scan_with_runs):
+    client, _ = admin_client
+    resp = client.get(f"/api/v1/admin/scans/{scan_with_runs.id}/runs?page=1&page_size=2")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+def test_list_scan_runs_returns_404_for_missing_scan(admin_client):
+    client, _ = admin_client
+    resp = client.get("/api/v1/admin/scans/9999/runs")
+    assert resp.status_code == 404

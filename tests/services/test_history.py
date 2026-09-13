@@ -83,6 +83,17 @@ def test_count_runs_respects_outcome_filter(db):
     assert count_runs(db, scan.id, u.id) == 2
 
 
+def test_list_runs_admin_scope_ignores_owner(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    _make_run(db, scan.id)
+    _make_run(db, scan.id)
+    runs = list_runs(db, scan.id, admin=True)
+    assert len(runs) == 2
+
+
 def test_list_runs_raises_forbidden_for_wrong_owner(db):
     u1 = make_user(db, "a@e.com")
     u2 = make_user(db, "b@e.com")
