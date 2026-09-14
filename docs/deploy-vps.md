@@ -1,150 +1,122 @@
-# VPS Deployment via GitHub Actions
+# VPS Deployment (CI/CD via GitHub Actions)
 
-Automatically redeploy CampBuddy on the VPS whenever a commit lands on `main`.
+CampBuddy redeploys automatically whenever a commit lands on `main` **and** the
+tests + migration checks pass. Images are built once on the GitHub runner,
+pushed to the GitHub Container Registry (GHCR), and pulled on the VPS — the VPS
+never builds anything.
 
 ## How It Works
 
 ```
-developer pushes to main
-        │
-        ▼
-GitHub detects push event
-        │
-        ▼
-GitHub Actions runner starts (ubuntu-latest, hosted by GitHub)
-        │
-        ▼
-Runner SSHes into your VPS using a stored private key
-        │
-        ▼
-Runner executes on VPS:
-  git pull origin main
-  docker compose build
-  docker compose up -d
-        │
-        ▼
-New containers running, old ones replaced
+push to main
+      │
+      ▼
+.github/workflows/ci.yml
+  ┌────────┐   ┌──────────────┐
+  │  test  │   │  migrations  │     (also run on every PR)
+  └───┬────┘   └──────┬───────┘
+      └───────┬───────┘
+              ▼   needs: [test, migrations]  +  only on push to main
+        ┌──────────┐
+        │  build   │  build 3 images, push to GHCR, tagged :<commit-sha> and :latest
+        └────┬─────┘
+             ▼   needs: build
+        ┌──────────┐
+        │  deploy  │  SSH to VPS → git pull → docker compose pull → up -d
+        │          │  → health check → prune
+        └──────────┘
 ```
 
-The VPS never contacts GitHub — GitHub contacts the VPS. The only requirement is that your VPS accepts SSH connections from the internet (standard port 22, or whichever port you use).
+The VPS never contacts GitHub — GitHub contacts the VPS over SSH. A commit that
+fails tests or the migration check never reaches the `build`/`deploy` stage.
+
+### Why build in CI instead of on the VPS
+
+- The VPS doesn't burn CPU/RAM building images (the Playwright image is heavy and
+  can OOM a small box).
+- Every deploy is an **immutable, versioned artifact** (tagged by commit SHA),
+  so rollback is a one-liner (see [Rollback](#rollback)).
+- Buildx layer caching in CI keeps repeat deploys fast.
+
+### The three images
+
+| Image | Services | Build context / Dockerfile |
+|-------|----------|----------------------------|
+| `ghcr.io/onurburak9/campbuddy` | `app`, `api` (same image) | `.` / `Dockerfile` |
+| `ghcr.io/onurburak9/campbuddy-frontend` | `frontend` | `./frontend` / `frontend/Dockerfile` |
+| `ghcr.io/onurburak9/campbuddy-playwright` | `playwright` | `.` / `playwright_service/Dockerfile` |
+
+`docker-compose.yml` references each with `image: …:${CAMPBUDDY_TAG:-latest}`.
+The deploy exports `CAMPBUDDY_TAG=<commit-sha>` so all four services pull the
+exact build for that commit. The `build:` blocks remain so `docker compose build`
+still works for local development.
 
 ---
 
-## Prerequisites
+## One-Time Setup
 
-- A VPS with Docker and Docker Compose installed and CampBuddy already running
-- SSH access to the VPS (you can already `ssh user@your-vps`)
-- Admin access to the GitHub repository (to add secrets)
-- `ssh-keygen` available on your local machine
+### Prerequisites
 
----
+- A VPS with Docker + Docker Compose installed and a **git checkout of this repo**
+  already present (the deploy does `git pull` there to update the compose file).
+- SSH access to the VPS (you can already `ssh user@your-vps`).
+- Admin access to the GitHub repository (to add secrets/variables).
 
-## Step 1 — Generate a Dedicated Deploy SSH Keypair
+### Step 1 — GHCR (no action needed)
 
-Do this on your **local machine** (not the VPS). Using a dedicated key means you can revoke deploy access without touching your personal key.
+The images live in the GitHub Container Registry under `ghcr.io/onurburak9/…`
+and stay **private**. There's nothing to configure and nothing to make public:
+the `build` job pushes with the workflow's built-in `GITHUB_TOKEN`, and the
+`deploy` job passes that same short-lived token to the VPS so `docker compose
+pull` can authenticate. The token is valid only for the duration of the job, and
+the deploy script runs `docker logout` when it's done.
+
+### Step 2 — Generate a dedicated deploy SSH keypair
+
+On your **local machine** (not the VPS). A dedicated key can be revoked without
+touching your personal key.
 
 ```bash
 ssh-keygen -t ed25519 -C "campbuddy-deploy" -f ~/.ssh/campbuddy_deploy
 ```
 
-This creates two files:
-- `~/.ssh/campbuddy_deploy` — **private key** (goes into GitHub)
-- `~/.ssh/campbuddy_deploy.pub` — **public key** (goes onto the VPS)
-
----
-
-## Step 2 — Authorize the Key on the VPS
-
-Copy the public key to the VPS:
+Authorize the public key on the VPS:
 
 ```bash
 ssh-copy-id -i ~/.ssh/campbuddy_deploy.pub user@your-vps
+# verify:
+ssh -i ~/.ssh/campbuddy_deploy user@your-vps "echo ok"   # should print: ok
 ```
 
-Or manually append it:
+### Step 3 — Add GitHub secrets and variables
+
+**Settings → Secrets and variables → Actions.**
+
+Secrets (**Secrets** tab):
+
+| Secret | Value |
+|--------|-------|
+| `VPS_HOST` | VPS IP or hostname, e.g. `203.0.113.42` |
+| `VPS_USER` | SSH user, e.g. `ubuntu` |
+| `VPS_SSH_KEY` | Full contents of `~/.ssh/campbuddy_deploy` (the private key, including the BEGIN/END lines) |
+
+Variable (**Variables** tab — not sensitive, so it lives here):
+
+| Variable | Value |
+|----------|-------|
+| `VPS_APP_DIR` | Absolute path to the repo checkout on the VPS, e.g. `/home/ubuntu/campbuddy` |
+
+### Step 4 — First deploy
+
+Push any commit to `main` (or re-run the latest `CI` run). Watch **Actions → CI**:
+`test` and `migrations` run first, then `build`, then `deploy`. The deploy logs
+show the SSH connection, `docker compose pull`, `up -d`, and the health check.
+
+Confirm on the VPS:
 
 ```bash
-cat ~/.ssh/campbuddy_deploy.pub | ssh user@your-vps "cat >> ~/.ssh/authorized_keys"
-```
-
-Verify it works before continuing:
-
-```bash
-ssh -i ~/.ssh/campbuddy_deploy user@your-vps "echo ok"
-# should print: ok
-```
-
----
-
-## Step 3 — Add Secrets to GitHub
-
-Go to your repository on GitHub:
-**Settings → Secrets and variables → Actions → New repository secret**
-
-Add these three secrets:
-
-| Secret name | Value |
-|-------------|-------|
-| `VPS_HOST` | Your VPS IP or hostname, e.g. `203.0.113.42` |
-| `VPS_USER` | The SSH user on the VPS, e.g. `ubuntu` or `root` |
-| `VPS_SSH_KEY` | The full contents of `~/.ssh/campbuddy_deploy` (the private key) |
-
-To copy the private key contents:
-
-```bash
-cat ~/.ssh/campbuddy_deploy
-```
-
-Copy everything including the `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----` lines.
-
----
-
-## Step 4 — Create the GitHub Actions Workflow
-
-Create the file `.github/workflows/deploy.yml` in the repository:
-
-```yaml
-name: Deploy to VPS
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /path/to/campbuddy
-            git pull origin main
-            docker compose build
-            docker compose up -d
-            docker system prune -f
-```
-
-Replace `/path/to/campbuddy` with the actual path on your VPS (e.g. `/home/ubuntu/campbuddy`).
-
-The `docker system prune -f` at the end removes dangling images from previous builds, keeping disk usage in check.
-
----
-
-## Step 5 — Verify It Works
-
-1. Commit and push any small change to `main`
-2. Go to your repository on GitHub → **Actions** tab
-3. You should see the "Deploy to VPS" workflow running
-4. Click into it to see live logs — you'll see the SSH connection, `git pull`, and Docker output
-5. SSH into the VPS and confirm the containers restarted:
-
-```bash
-docker compose ps
+cd $VPS_APP_DIR
+docker compose ps          # all services running/healthy
 docker compose logs --tail=20 app
 ```
 
@@ -152,42 +124,73 @@ docker compose logs --tail=20 app
 
 ## What Happens During a Deploy
 
-The sequence on the VPS is:
+On the VPS, the `deploy` job runs:
 
-1. `git pull origin main` — fetches the latest code
-2. `docker compose build` — rebuilds the `app` image with the new code (uses Docker layer cache, so only changed layers rebuild)
-3. `docker compose up -d` — recreates containers that have a new image; containers with no changes are left running untouched
-4. `docker system prune -f` — cleans up old image layers
+1. `git pull origin main` — updates the compose file/config (no building).
+2. `export CAMPBUDDY_TAG=<commit-sha>` — pins every service to this build.
+3. `docker compose pull` — fetches the pre-built images from GHCR.
+4. `docker compose up -d` — recreates changed containers; unchanged ones stay up.
+5. **Health check** — fails the job (with recent logs) if any service isn't
+   `running`, or if any healthcheck reports `unhealthy`.
+6. `docker image prune -f` — reclaims dangling layers.
 
-Total downtime is the time it takes Docker to stop the old container and start the new one — typically a few seconds.
+Migrations run automatically inside the `app` container's `entrypoint.sh`
+(`alembic upgrade head`) before the scheduler starts — see
+[Schema Changes](agents/schema-changes.md). Because `set -e` is in the
+entrypoint, a failed migration crashes the `app` container, which the deploy
+health check catches. For **riskier** migrations (NOT NULL backfills, large index
+rebuilds), run them explicitly first as described in that doc.
+
+Total downtime is the few seconds Docker takes to swap containers.
 
 ---
 
 ## Rollback
 
-If a bad deploy goes out, SSH into the VPS and roll back manually:
+Every image is tagged by commit SHA, so rollback needs no rebuild. `docker image
+prune -f` only removes *dangling* (untagged) layers, so recently-deployed
+SHA-tagged images stay cached on the VPS — rolling back to a recent build needs
+no pull or login. SSH into the VPS and redeploy an earlier SHA:
 
 ```bash
-cd /path/to/campbuddy
-git log --oneline -5          # find the last good commit hash
-git checkout <commit-hash>    # detach to that commit
-docker compose build
-docker compose up -d
+cd $VPS_APP_DIR
+git log --oneline -10                        # find the last good commit SHA
+CAMPBUDDY_TAG=<old-sha> docker compose up -d  # uses the locally cached image
 ```
 
-To return to tracking main after fixing the issue:
+If that image is no longer on the VPS, authenticate to GHCR first with a token
+that has `read:packages`, then re-run:
 
 ```bash
-git checkout main
-git pull origin main
-docker compose build && docker compose up -d
+echo <token> | docker login ghcr.io -u <github-username> --password-stdin
+CAMPBUDDY_TAG=<old-sha> docker compose pull && CAMPBUDDY_TAG=<old-sha> docker compose up -d
 ```
+
+To return to tracking `main` after fixing forward, just push the fix — the next
+deploy pins to the new SHA.
 
 ---
 
 ## Security Notes
 
-- The deploy key has SSH access to the VPS. Treat the private key as a password — never commit it to the repository.
-- GitHub encrypts secrets at rest and never exposes them in logs.
-- The key only needs to run `git pull` and `docker compose` commands. If you want to restrict it further, you can use `authorized_keys` command restrictions, but this is optional for a personal project.
-- Consider creating a dedicated `deploy` user on the VPS with access only to the campbuddy directory and Docker, rather than using `root` or your personal user.
+- The deploy key has SSH access to the VPS — treat the private key like a
+  password and never commit it. GitHub encrypts secrets at rest and masks them in
+  logs.
+- CI pushes to GHCR with the built-in `GITHUB_TOKEN` (`packages: write`); no
+  personal token is stored. The VPS pulls with the same token (scoped
+  `packages: read`), passed over SSH for the deploy only, then logged out.
+- Consider a dedicated `deploy` user on the VPS scoped to the campbuddy directory
+  and Docker rather than `root`.
+
+---
+
+## Optional Add-Ons (not currently enabled)
+
+- **Prevent overlapping deploys** — add to `ci.yml`:
+  ```yaml
+  concurrency:
+    group: deploy-${{ github.ref }}
+    cancel-in-progress: false
+  ```
+- **Manual deploy / one-click rollback** — add `workflow_dispatch` with an image
+  tag input and point the deploy at it.
