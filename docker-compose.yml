@@ -1,5 +1,10 @@
+# Images are built and pushed to GHCR by the CI workflow (.github/workflows/ci.yml)
+# and pulled on the VPS at deploy time. CAMPBUDDY_TAG pins every service to one
+# build (the commit SHA); it defaults to `latest` for local use. The `build:`
+# blocks are kept so `docker compose build` still works for local development.
 services:
   app:
+    image: ghcr.io/onurburak9/campbuddy:${CAMPBUDDY_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,6 +17,7 @@ services:
     restart: unless-stopped
 
   api:
+    image: ghcr.io/onurburak9/campbuddy:${CAMPBUDDY_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -23,9 +29,18 @@ services:
       - app
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      # python:3.11-slim has no curl; use urllib. urlopen raises (non-zero exit)
+      # on any non-2xx, so this fails the container's health if /health is down.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/onurburak9/campbuddy-frontend:${CAMPBUDDY_TAG:-latest}
     build: ./frontend
     ports:
       # Host port is configurable to avoid clashing with other apps (e.g. an
@@ -36,6 +51,7 @@ services:
     restart: unless-stopped
 
   playwright:
+    image: ghcr.io/onurburak9/campbuddy-playwright:${CAMPBUDDY_TAG:-latest}
     build:
       context: .
       dockerfile: playwright_service/Dockerfile

@@ -1,0 +1,146 @@
+name: CI
+
+# One workflow gates the whole pipeline: tests + migration checks run on every
+# push and PR; build + deploy run only after both pass on a push to main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply migrations to blank database
+        run: |
+          mkdir -p data
+          DATABASE_URL="sqlite:///./data/ci.db" alembic upgrade head
+      - name: Check for schema drift
+        run: DATABASE_URL="sqlite:///./data/ci.db" alembic check
+
+  build:
+    # Only build/push real images once code is proven green, and never for PRs.
+    needs: [test, migrations]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: campbuddy
+            context: .
+            dockerfile: ./Dockerfile
+          - image: campbuddy-frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+          - image: campbuddy-playwright
+            context: .
+            dockerfile: ./playwright_service/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          # SHA tag is the immutable deploy/rollback target; latest is the fallback.
+          tags: |
+            ghcr.io/onurburak9/${{ matrix.image }}:${{ github.sha }}
+            ghcr.io/onurburak9/${{ matrix.image }}:latest
+          # Per-image layer cache so heavy builds (Playwright) don't rebuild from
+          # scratch every deploy.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GIT_SHA: ${{ github.sha }}
+          APP_DIR: ${{ vars.VPS_APP_DIR }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GIT_SHA,APP_DIR,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -e
+            cd "${APP_DIR}"
+
+            # Pull the compose file / config for this commit (no building on the VPS).
+            git pull origin main
+
+            # Authenticate to GHCR with the workflow's short-lived token so the VPS
+            # can pull the private images. The token is valid only for this job run.
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+
+            # Pin every service to the image built for this commit, then roll.
+            export CAMPBUDDY_TAG="${GIT_SHA}"
+            docker compose pull
+            docker compose up -d
+
+            # --- post-deploy health check ---
+            # -a so crashed/exited containers (e.g. a failed migration in `app`)
+            # still show up; without it Compose V2 hides non-running containers
+            # and the check would pass over a container that died on startup.
+            sleep 5
+            docker compose ps -a
+
+            not_running=$(docker compose ps -a --format '{{.Service}} {{.State}}' | awk '$2 != "running"')
+            if [ -n "$not_running" ]; then
+              echo "::error::Services not running after deploy:"
+              echo "$not_running"
+              docker compose logs --tail=50
+              exit 1
+            fi
+
+            unhealthy=$(docker compose ps -a --format '{{.Service}} {{.Health}}' | awk '$2 == "unhealthy"')
+            if [ -n "$unhealthy" ]; then
+              echo "::error::Unhealthy services after deploy:"
+              echo "$unhealthy"
+              docker compose logs --tail=50
+              exit 1
+            fi
+
+            # Reclaim disk from dangling image layers left by the pull, and drop
+            # the (already-expiring) GHCR credentials from the VPS.
+            docker image prune -f
+            docker logout ghcr.io

@@ -28,6 +28,12 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])
 
 
+@app.get("/health", tags=["health"])
+async def health():
+    """Unauthenticated liveness probe used by the deploy health check and Docker."""
+    return {"status": "ok"}
+
+
 @app.exception_handler(NotFound)
 async def not_found_handler(request, exc):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
