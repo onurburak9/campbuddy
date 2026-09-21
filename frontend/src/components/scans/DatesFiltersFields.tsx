@@ -41,7 +41,7 @@ function DateTemplateRow({ set }: { set: Setter }) {
   };
 
   return (
-    <div className="space-y-2 rounded-md bg-sand-100/60 p-3 dark:bg-[#161616]">
+    <div data-tour="quick-picks" className="space-y-2 rounded-md bg-sand-100/60 p-3 dark:bg-[#161616]">
       <span className="block text-xs text-stone-500 dark:text-[#888]">Quick picks</span>
       <div className="flex flex-wrap items-end gap-1.5">
         <Button type="button" variant="secondary" size="sm"
@@ -105,18 +105,29 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
       <div className="space-y-2">
         <span className="block text-sm text-stone-600 dark:text-[#888]">Search windows</span>
         <DateTemplateRow set={set} />
-        {summary && (
-          <p data-testid="search-summary" className="text-sm font-medium text-forest-700 dark:text-forest-400">
-            {summary}
-          </p>
-        )}
+        <p
+          data-testid="search-summary"
+          data-tour="search-summary"
+          className={
+            summary
+              ? "text-sm font-medium text-forest-700 dark:text-forest-400"
+              : "text-sm text-stone-400 dark:text-[#666]"
+          }
+        >
+          {summary ?? "Pick a quick pick above, or add a window below, to see what you'll be searching."}
+        </p>
         {state.windows.map((w, i) => (
           <div key={i} className="flex items-end gap-2">
             <Input type="date" value={w.start_date}
               {...(i === 0 ? { label: "Search from" } : { "aria-label": `Search from (range ${i + 1})` })}
               onChange={(e) => updateWindow(i, { start_date: e.target.value })} />
             <Input type="date" value={w.end_date}
-              {...(i === 0 ? { label: "Search until" } : { "aria-label": `Search until (range ${i + 1})` })}
+              {...(i === 0
+                ? {
+                    label: "Search until",
+                    hint: "The day you'd check out. The last night searched is the day before this.",
+                  }
+                : { "aria-label": `Search until (range ${i + 1})` })}
               onChange={(e) => updateWindow(i, { end_date: e.target.value })} />
             <Button type="button" variant="ghost" size="sm" onClick={() => removeWindow(i)}>
               Remove
@@ -127,8 +138,10 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
           + Add window
         </Button>
       </div>
+      <div data-tour="nights-field">
       <Input
         label="Consecutive nights"
+        hint="How long a stay to look for, exactly - 2 will not match a single free night. Quick picks overwrite this."
         type="number"
         min={1}
         value={state.nights === 0 ? "" : state.nights}
@@ -141,6 +154,7 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
         }}
         onBlur={() => { if (state.nights === 0) set("nights", 1); }}
       />
+      </div>
       {nightsExceedWindow && (
         <p className="text-sm text-[#DC2626]">
           Consecutive nights ({state.nights}) can't be longer than the shortest search window ({shortestWindowNights} night{shortestWindowNights === 1 ? "" : "s"}).

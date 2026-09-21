@@ -15,6 +15,8 @@ export function Input({ label, error, hint, className, id, ...rest }: Props) {
           {label}
           {hint && (
             <span
+              // Decorative: keeps the "i" out of the field's accessible name.
+              aria-hidden
               title={hint}
               className="inline-flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full border border-stone-400 text-[10px] leading-none text-stone-500 dark:border-[#555] dark:text-[#888]"
             >
