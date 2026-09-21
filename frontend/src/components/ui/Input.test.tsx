@@ -13,4 +13,9 @@ describe("Input", () => {
     render(<Input label="Add by ID" hint="Find this in the URL" />);
     expect(screen.getByTitle("Find this in the URL")).toBeInTheDocument();
   });
+
+  it("keeps the hint icon out of the field's accessible name", () => {
+    render(<Input label="Consecutive nights" hint="Quick picks overwrite this" />);
+    expect(screen.getByTitle("Quick picks overwrite this")).toHaveAttribute("aria-hidden", "true");
+  });
 });

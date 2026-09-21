@@ -6,17 +6,27 @@ import { VerticalStepIndicator } from "./VerticalStepIndicator";
 import { Button } from "../ui/Button";
 import { useCreateScan } from "../../hooks/useScans";
 import { useAuth } from "../../contexts/AuthContext";
-import { hasSeenWizardTour, startWizardProviderTour } from "../../lib/tour";
+import {
+  hasSeenWizardTour,
+  startWizardProviderTour,
+  hasSeenWizardDatesTour,
+  startWizardDatesTour,
+} from "../../lib/tour";
 import { windowsBlockingReason } from "../../lib/searchWindows";
 
 const STEPS = ["Provider & Sites", "Dates & Filters", "Notifications"];
 
-function TourHelpButton({ className }: { className?: string }) {
+const STEP_TOURS: (undefined | { start: () => () => void; hasSeen: () => boolean })[] = [
+  { start: startWizardProviderTour, hasSeen: hasSeenWizardTour },
+  { start: startWizardDatesTour, hasSeen: hasSeenWizardDatesTour },
+];
+
+function TourHelpButton({ onClick, className }: { onClick: () => void; className?: string }) {
   return (
     <button
       type="button"
       aria-label="Show tips for this step"
-      onClick={startWizardProviderTour}
+      onClick={onClick}
       className={
         "flex h-5 w-5 items-center justify-center rounded-full border border-sand-200 text-xs text-stone-500 " +
         "hover:bg-sand-100 dark:border-[#222] dark:text-[#888] dark:hover:bg-[#222] " +
@@ -38,10 +48,14 @@ export function ScanWizardPanel({ onClose, onCreated }: {
   const [error, setError] = useState<string | null>(null);
   const atLimit = !!user && user.scans_used >= user.scan_limit;
 
+  // Each step owns its tour and its own seen flag, so reaching the dates step
+  // for the first time still gets an introduction even on a later visit.
+  const stepTour = STEP_TOURS[step];
+
   useEffect(() => {
-    if (hasSeenWizardTour()) return;
-    return startWizardProviderTour();
-  }, []);
+    if (!stepTour || stepTour.hasSeen()) return;
+    return stepTour.start();
+  }, [stepTour]);
 
   const hasAnyIds = form.state.recAreaIds.length > 0 || form.state.campgroundIds.length > 0 || form.state.campsiteIds.length > 0;
   const windowsReason = windowsBlockingReason(form.state.windows, new Date());
@@ -74,7 +88,7 @@ export function ScanWizardPanel({ onClose, onCreated }: {
       <div className="hidden w-56 border-r border-sand-200 p-6 dark:border-[#222] md:block">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-stone-800 dark:text-[#EEE]">New Scan</h2>
-          {step === 0 && <TourHelpButton />}
+          {stepTour && <TourHelpButton onClick={stepTour.start} />}
         </div>
         <VerticalStepIndicator steps={STEPS} current={step} />
       </div>
@@ -83,7 +97,7 @@ export function ScanWizardPanel({ onClose, onCreated }: {
           <p className="text-sm font-medium text-stone-600 dark:text-[#AAA]">
             Step {step + 1} of {STEPS.length} · {STEPS[step]}
           </p>
-          {step === 0 && <TourHelpButton />}
+          {stepTour && <TourHelpButton onClick={stepTour.start} />}
         </div>
         <div className="max-w-xl flex-1">
           {step === 0 && <ProviderSitesFields state={form.state} set={form.set} />}

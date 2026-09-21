@@ -34,7 +34,7 @@ describe("DatesFiltersFields — consecutive nights input", () => {
   it("allows clearing the field to empty instead of snapping back to 1 on every keystroke", async () => {
     const user = userEvent.setup();
     render(<ControlledDatesFilters initial={{ nights: 3 }} />);
-    const input = screen.getByLabelText("Consecutive nights") as HTMLInputElement;
+    const input = screen.getByLabelText(/consecutive nights/i) as HTMLInputElement;
 
     await user.clear(input);
 
@@ -44,7 +44,7 @@ describe("DatesFiltersFields — consecutive nights input", () => {
   it("resets an empty field back to 1 on blur", async () => {
     const user = userEvent.setup();
     render(<ControlledDatesFilters initial={{ nights: 3 }} />);
-    const input = screen.getByLabelText("Consecutive nights") as HTMLInputElement;
+    const input = screen.getByLabelText(/consecutive nights/i) as HTMLInputElement;
 
     await user.clear(input);
     await user.tab();
@@ -128,7 +128,7 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
 
     expect(dateValues(container)).toEqual(["2026-10-01", "2026-11-01"]);
     expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByLabelText("Consecutive nights")).toHaveValue(2);
+    expect(screen.getByLabelText(/consecutive nights/i)).toHaveValue(2);
   });
 
   it("clamps the current month to today so a template never emits a past date", async () => {
@@ -157,7 +157,7 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
 
     expect(dateValues(container)).toEqual(["2026-09-25", "2026-09-27"]);
     expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByLabelText("Consecutive nights")).toHaveValue(2);
+    expect(screen.getByLabelText(/consecutive nights/i)).toHaveValue(2);
   });
 
   it("leaves a generated window editable afterwards", async () => {
@@ -180,9 +180,9 @@ describe("DatesFiltersFields — search summary and window labels", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("shows no summary until a window is complete", () => {
+  it("prompts rather than going blank until a window is complete", () => {
     render(<ControlledDatesFilters initial={{}} />);
-    expect(screen.queryByTestId("search-summary")).not.toBeInTheDocument();
+    expect(screen.getByTestId("search-summary")).toHaveTextContent(/pick|add/i);
   });
 
   it("summarises a month template in nights, never showing the exclusive end date", async () => {
@@ -203,7 +203,7 @@ describe("DatesFiltersFields — search summary and window labels", () => {
 
     await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
     await user.click(screen.getByRole("button", { name: "All of October" }));
-    const nights = screen.getByLabelText("Consecutive nights");
+    const nights = screen.getByLabelText(/consecutive nights/i);
     await user.clear(nights);
     await user.type(nights, "3");
 
@@ -226,7 +226,7 @@ describe("DatesFiltersFields — search summary and window labels", () => {
     await user.click(screen.getByRole("button", { name: "Next weekend" }));
 
     expect(screen.getByLabelText("Search from")).toHaveValue("2026-09-25");
-    expect(screen.getByLabelText("Search until")).toHaveValue("2026-09-27");
+    expect(screen.getByLabelText(/search until/i)).toHaveValue("2026-09-27");
   });
 });
 
@@ -245,9 +245,35 @@ describe("DatesFiltersFields — single weekend night template", () => {
     await user.click(screen.getByRole("button", { name: "Any Fri/Sat night in October" }));
 
     expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByLabelText("Consecutive nights")).toHaveValue(1);
+    expect(screen.getByLabelText(/consecutive nights/i)).toHaveValue(1);
     expect(screen.getByTestId("search-summary")).toHaveTextContent(
       "Any Fri or Sat night between Oct 1 and Oct 31, 2026",
     );
+  });
+});
+
+describe("DatesFiltersFields — guidance", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 20, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("anchors the three tour stops the dates tour walks through", () => {
+    const { container } = render(<ControlledDatesFilters initial={{}} />);
+    for (const anchor of ["quick-picks", "search-summary", "nights-field"]) {
+      expect(container.querySelector(`[data-tour="${anchor}"]`)).not.toBeNull();
+    }
+  });
+
+  it("warns on the nights field that a quick pick will overwrite it", () => {
+    render(<ControlledDatesFilters initial={{}} />);
+    expect(screen.getByTitle(/quick pick/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/exactly/i)).toBeInTheDocument();
+  });
+
+  it("explains that Search until is the check-out day, not the last night", () => {
+    render(<ControlledDatesFilters initial={{ windows: [{ start_date: "", end_date: "" }] }} />);
+    expect(screen.getByTitle(/check out|last night/i)).toBeInTheDocument();
   });
 });

@@ -27,11 +27,15 @@ export type CreatedScanBody = Record<string, unknown>;
  * ambiguity, and so an unstubbed call fails loudly instead of reaching the dead
  * dev-server proxy.
  */
-export async function mockApi(page: Page, onCreateScan?: (body: CreatedScanBody) => void) {
+export async function mockApi(
+  page: Page,
+  onCreateScan?: (body: CreatedScanBody) => void,
+) {
   await page.addInitScript(() => {
     // Suppress the driver.js onboarding tours; their overlay swallows clicks.
     localStorage.setItem("campbuddy:tour-seen:welcome", "1");
     localStorage.setItem("campbuddy:tour-seen:wizard", "1");
+    localStorage.setItem("campbuddy:tour-seen:wizard-dates", "1");
   });
 
   await page.route("**/api/v1/**", async (route: Route) => {
