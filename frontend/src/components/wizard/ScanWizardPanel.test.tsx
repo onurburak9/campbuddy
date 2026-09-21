@@ -54,14 +54,14 @@ describe("ScanWizardPanel", () => {
     // Step 1 — add a Recreation Area by ID via the SearchSelect's fallback input
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 2 — add a window
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     // first two empty inputs are the date pickers
     await userEvent.type(dates[0], "2026-07-01");
     await userEvent.type(dates[1], "2026-07-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 3 — create
     await userEvent.click(screen.getByRole("button", { name: /create scan/i }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
@@ -73,12 +73,12 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     await userEvent.type(dates[0], "2026-07-01");
     await userEvent.type(dates[1], "2026-07-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/reached your scan limit/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create scan/i })).toBeDisabled();
@@ -89,7 +89,7 @@ describe("ScanWizardPanel", () => {
     expect(screen.getByText(/step 1 of 3 · provider & sites/i)).toBeInTheDocument();
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     expect(screen.queryByRole("button", { name: /show tips for this step/i })).not.toBeInTheDocument();
   });
 
@@ -126,8 +126,8 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/add at least one search window with start and end dates/i))
       .toBeInTheDocument();
@@ -139,12 +139,12 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     await userEvent.type(dates[0], "2026-04-01");
     await userEvent.type(dates[1], "2026-04-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/at least one search window must end today or later/i))
       .toBeInTheDocument();
