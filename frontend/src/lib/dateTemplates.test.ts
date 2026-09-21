@@ -78,9 +78,9 @@ describe("nextTwoWeekends", () => {
 });
 
 describe("wholeMonth", () => {
-  it("spans a future month end to end as a single window", () => {
+  it("spans a future month end to end, checking out on the 1st of the next", () => {
     expect(wholeMonth("2026-10", SUN_SEP_20)).toEqual({
-      windows: [{ start_date: "2026-10-01", end_date: "2026-10-31" }],
+      windows: [{ start_date: "2026-10-01", end_date: "2026-11-01" }],
       nights: 1,
       weekendsOnly: false,
       daysOfWeek: [],
@@ -89,19 +89,19 @@ describe("wholeMonth", () => {
 
   it("clamps the current month's start to today so it never emits a past date", () => {
     expect(wholeMonth("2026-09", SUN_SEP_20).windows).toEqual([
-      { start_date: "2026-09-20", end_date: "2026-09-30" },
+      { start_date: "2026-09-20", end_date: "2026-10-01" },
     ]);
   });
 
   it("handles a 28-day February", () => {
     expect(wholeMonth("2027-02", SUN_SEP_20).windows).toEqual([
-      { start_date: "2027-02-01", end_date: "2027-02-28" },
+      { start_date: "2027-02-01", end_date: "2027-03-01" },
     ]);
   });
 
   it("handles a leap-year February", () => {
     expect(wholeMonth("2028-02", SUN_SEP_20).windows).toEqual([
-      { start_date: "2028-02-01", end_date: "2028-02-29" },
+      { start_date: "2028-02-01", end_date: "2028-03-01" },
     ]);
   });
 });
@@ -109,7 +109,7 @@ describe("wholeMonth", () => {
 describe("weekendsInMonth", () => {
   it("uses one month-long window plus the weekends-only filter, not one window per weekend", () => {
     expect(weekendsInMonth("2026-10", SUN_SEP_20)).toEqual({
-      windows: [{ start_date: "2026-10-01", end_date: "2026-10-31" }],
+      windows: [{ start_date: "2026-10-01", end_date: "2026-11-01" }],
       nights: 2,
       weekendsOnly: true,
       daysOfWeek: [],
@@ -119,13 +119,13 @@ describe("weekendsInMonth", () => {
   it("still produces exactly one window for a month containing five Fridays", () => {
     // January 2027 has Fridays on the 1st, 8th, 15th, 22nd and 29th.
     expect(weekendsInMonth("2027-01", SUN_SEP_20).windows).toEqual([
-      { start_date: "2027-01-01", end_date: "2027-01-31" },
+      { start_date: "2027-01-01", end_date: "2027-02-01" },
     ]);
   });
 
   it("clamps the current month's start to today", () => {
     expect(weekendsInMonth("2026-09", SUN_SEP_20).windows).toEqual([
-      { start_date: "2026-09-20", end_date: "2026-09-30" },
+      { start_date: "2026-09-20", end_date: "2026-10-01" },
     ]);
   });
 });
@@ -144,11 +144,17 @@ describe("upcomingMonths", () => {
     expect(upcomingMonths(SUN_SEP_20)[0].key).toBe("2026-09");
   });
 
-  it("drops the current month once no full night is left in it", () => {
-    // Wed 30 Sep 2026 is the last day: a Sept window would be zero nights.
+  it("still offers the current month on its last day, when one night remains", () => {
+    // Wed 30 Sep 2026 is the last day, but 30 Sep -> 1 Oct is a bookable night.
     const keys = upcomingMonths(new Date(2026, 8, 30, 12)).map((m) => m.key);
-    expect(keys[0]).toBe("2026-10");
+    expect(keys[0]).toBe("2026-09");
     expect(keys).toHaveLength(12);
+  });
+
+  it("keeps the last day of the month bookable as a single night", () => {
+    expect(wholeMonth("2026-09", new Date(2026, 8, 30, 12)).windows).toEqual([
+      { start_date: "2026-09-30", end_date: "2026-10-01" },
+    ]);
   });
 
   it("exposes a bare month name for button labels alongside the full label", () => {

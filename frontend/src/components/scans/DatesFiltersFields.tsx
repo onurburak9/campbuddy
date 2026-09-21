@@ -13,11 +13,9 @@ import {
   wholeMonth,
 } from "../../lib/dateTemplates";
 import type { DateTemplateResult } from "../../lib/dateTemplates";
+import { describeSearch, DAY_NAMES } from "../../lib/describeSearch";
 
-const DAYS = [
-  { i: 0, label: "Mon" }, { i: 1, label: "Tue" }, { i: 2, label: "Wed" },
-  { i: 3, label: "Thu" }, { i: 4, label: "Fri" }, { i: 5, label: "Sat" }, { i: 6, label: "Sun" },
-];
+const DAYS = DAY_NAMES.map((label, i) => ({ i, label }));
 
 export function windowNights(w: SearchWindow): number | null {
   if (!w.start_date || !w.end_date) return null;
@@ -88,17 +86,32 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
     .filter((n): n is number => n !== null);
   const shortestWindowNights = windowNightCounts.length ? Math.min(...windowNightCounts) : null;
   const nightsExceedWindow = shortestWindowNights !== null && state.nights > shortestWindowNights;
+  // Mirrors the payload's Math.max(1, nights) so the summary never reads
+  // "0 nights" while the nights field is momentarily cleared.
+  const summary = describeSearch(
+    state.windows,
+    Math.max(1, state.nights),
+    state.weekendsOnly,
+    state.daysOfWeek,
+  );
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <span className="block text-sm text-stone-600 dark:text-[#888]">Search windows</span>
         <DateTemplateRow set={set} />
+        {summary && (
+          <p data-testid="search-summary" className="text-sm font-medium text-forest-700 dark:text-forest-400">
+            {summary}
+          </p>
+        )}
         {state.windows.map((w, i) => (
           <div key={i} className="flex items-end gap-2">
             <Input type="date" value={w.start_date}
+              {...(i === 0 ? { label: "Search from" } : { "aria-label": `Search from (range ${i + 1})` })}
               onChange={(e) => updateWindow(i, { start_date: e.target.value })} />
             <Input type="date" value={w.end_date}
+              {...(i === 0 ? { label: "Search until" } : { "aria-label": `Search until (range ${i + 1})` })}
               onChange={(e) => updateWindow(i, { end_date: e.target.value })} />
             <Button type="button" variant="ghost" size="sm" onClick={() => removeWindow(i)}>
               Remove
