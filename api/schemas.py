@@ -217,6 +217,7 @@ class ScanResultResponse(BaseModel):
     last_seen_at: datetime
     is_available: bool
     cart_added: bool
+    cart_error: Optional[str] = None
     notified: bool
 
     class Config:

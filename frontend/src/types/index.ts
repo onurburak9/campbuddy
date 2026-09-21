@@ -79,6 +79,8 @@ export interface ScanResult {
   last_seen_at: string;
   is_available: boolean;
   cart_added: boolean;
+  /** Why the cart-add failed. Null when it succeeded or was never attempted. */
+  cart_error?: string | null;
   notified: boolean;
 }
 

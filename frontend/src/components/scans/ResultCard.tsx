@@ -27,7 +27,17 @@ export function ResultCard({ result }: { result: ScanResult }) {
           ) : (
             <Badge tone="error" size="md">Gone</Badge>
           )}
-          {result.cart_added ? <Badge tone="accent">In cart</Badge> : <Badge tone="neutral">Not in cart</Badge>}
+          {result.cart_added ? (
+            <Badge tone="accent">In cart</Badge>
+          ) : result.cart_error ? (
+            // A recorded reason means we tried and failed, which is different
+            // from never having attempted it.
+            <span title={result.cart_error}>
+              <Badge tone="error">Cart failed</Badge>
+            </span>
+          ) : (
+            <Badge tone="neutral">Not in cart</Badge>
+          )}
           {result.notified && <Badge tone="info">Notified</Badge>}
         </div>
         <a href={result.booking_url} target="_blank" rel="noopener noreferrer"

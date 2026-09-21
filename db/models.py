@@ -199,6 +199,10 @@ class ScanResult(Base):
     cart_added_at: Mapped[Optional[datetime]] = mapped_column(
         UTCDateTime, nullable=True
     )
+    # Why the cart-add failed, verbatim from the sidecar. Without it
+    # cart_added=False is ambiguous between "tried and failed", "skipped over
+    # the cap" and "never attempted". NULL means no failure was recorded.
+    cart_error: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notified_at: Mapped[Optional[datetime]] = mapped_column(
         UTCDateTime, nullable=True
