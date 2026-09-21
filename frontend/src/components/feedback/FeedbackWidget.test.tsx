@@ -24,9 +24,9 @@ describe("FeedbackWidget", () => {
       })
     );
     renderWidget("/scans/12");
-    await userEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    await userEvent.click(screen.getByRole("button", { name: /send feedback/i }));
     await userEvent.type(screen.getByRole("textbox"), "The button does nothing");
-    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^send$/i }));
     await waitFor(() => expect(screen.getByText(/thanks/i)).toBeInTheDocument());
     expect(body).toEqual({ page_path: "/scans/12", message: "The button does nothing" });
   });
@@ -34,18 +34,18 @@ describe("FeedbackWidget", () => {
   it("shows an inline error and preserves the message when the request fails", async () => {
     server.use(http.post("/api/v1/feedback", () => HttpResponse.json({ detail: "down" }, { status: 502 })));
     renderWidget();
-    await userEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    await userEvent.click(screen.getByRole("button", { name: /send feedback/i }));
     await userEvent.type(screen.getByRole("textbox"), "Still broken");
-    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^send$/i }));
     await waitFor(() => expect(screen.getByText(/couldn.t send feedback/i)).toBeInTheDocument());
     expect(screen.getByRole("textbox")).toHaveValue("Still broken");
   });
 
   it("disables the send button until a message is entered", async () => {
     renderWidget();
-    await userEvent.click(screen.getByRole("button", { name: /feedback/i }));
-    expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /send feedback/i }));
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
     await userEvent.type(screen.getByRole("textbox"), "x");
-    expect(screen.getByRole("button", { name: /send/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /^send$/i })).not.toBeDisabled();
   });
 });
