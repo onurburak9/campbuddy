@@ -153,7 +153,8 @@ def test_login_raises_when_the_logged_in_marker_never_appears():
 def test_add_single_succeeds_when_order_details_page_is_reached():
     page = make_campsite_page(url_after_cart_click=ORDER_DETAILS_URL)
     result = browser._add_single(page, CAMPSITE_URL, "10-12-2026", "10-14-2026")
-    assert result == {"success": True, "error": None}
+    assert result["success"] is True
+    assert result["error"] is None
 
 
 def test_add_single_fails_when_click_does_not_reach_order_details():
@@ -183,6 +184,32 @@ def test_add_single_injects_the_requested_stay_dates():
     session_script = page.evaluated[0]
     assert "10/12/2026" in session_script
     assert "10/14/2026" in session_script
+
+
+def test_add_single_reports_how_long_the_attempt_took():
+    """Feeds the cart-add latency panel in Grafana."""
+    page = make_campsite_page(url_after_cart_click=ORDER_DETAILS_URL)
+    result = browser._add_single(page, CAMPSITE_URL, "10-12-2026", "10-14-2026")
+    assert isinstance(result["duration_ms"], int)
+    assert result["duration_ms"] >= 0
+
+
+def test_add_single_reports_duration_on_failure_too():
+    page = make_campsite_page(url_after_cart_click=None)
+    result = browser._add_single(page, CAMPSITE_URL, "10-12-2026", "10-14-2026")
+    assert isinstance(result["duration_ms"], int)
+
+
+def test_add_all_reports_duration_when_a_site_raises():
+    def explode(page, *args):
+        raise RuntimeError("nav failed")
+
+    import unittest.mock as m
+    with m.patch.object(browser, "_add_single", side_effect=RuntimeError("nav failed")):
+        results = browser._add_all(FakePage(), [
+            {"booking_url": "u1", "check_in": "10-12-2026", "check_out": "10-14-2026"}])
+    assert isinstance(results[0]["duration_ms"], int)
+    assert results[0]["success"] is False
 
 
 def test_add_single_survives_a_missing_outdated_browser_banner():

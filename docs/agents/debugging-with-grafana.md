@@ -22,11 +22,15 @@ issues, cross-container correlation, or resource problems.
 | `campbuddy-frontend-1` | nginx + React SPA | static serving, proxy errors |
 | `campbuddy-playwright-1` | Playwright sidecar | browser automation, cart/add failures |
 
-**What is NOT available:** no app-level metrics (no scan-success or
-booking-latency counters — the app doesn't emit any), and no traces from
+**What is NOT available:** no Prometheus app-level metrics (no counters or
+histograms — the app exposes no `/metrics` endpoint), and no traces from
 campbuddy (a Tempo datasource exists but campbuddy sends nothing to it).
-Metrics are container-resource only. If you need app KPIs, they must be
-instrumented first (`/metrics` endpoint + Prometheus scrape).
+Prometheus metrics are container-resource only.
+
+**Structured app events are available in Loki.** The scheduler emits logfmt
+event lines that `| logfmt` parses into fields, so LogQL metric queries give
+you counts, rates and alerts without any Prometheus instrumentation — see
+[Cart-add outcomes](#cart-add-outcomes).
 
 ## Loki (logs) — LogQL
 
@@ -48,6 +52,75 @@ Loki labels: `container, instance, job, service_name, stream`.
 
 Tip: narrow the time range — Loki queries scan by time, and campbuddy is
 low-volume, so `now-6h` or `now-24h` is usually enough.
+
+## Cart-add outcomes
+
+`core/events.py` emits one logfmt line per cart-add attempt from
+`campbuddy-app-1`. This is the signal to use when asking "is add-to-cart
+actually working?" — `cart_added=False` in the database alone can't tell a
+genuine failure from a site that was never attempted.
+
+```
+event=cart_add result=success scan_id=12 campsite_id=42210 duration_ms=18004
+event=cart_add result=failure scan_id=12 campsite_id=42035 reason=button_disabled duration_ms=4120 error="Add to Cart is disabled for these dates"
+event=cart_add result=skipped scan_id=12 reason=over_cap capped=5 found=69
+```
+
+| Field | Notes |
+|-------|-------|
+| `result` | `success` \| `failure` \| `skipped` |
+| `reason` | closed set, safe as a label (see below) |
+| `error` | raw sidecar message, whitespace-collapsed to one line |
+| `duration_ms` | per-site, measured in the sidecar |
+
+Reason codes: `button_disabled` (already held or unbookable), `no_redirect`
+(click didn't reach order details), `login_failed` (Recreation.gov rejected
+the sign-in), `sidecar_unavailable`, `sidecar_error`, `over_cap`, `unknown`.
+Keep this set small — it is used as a Grafana label. The full message lives in
+the `error` field and in `scan_results.cart_error`.
+
+```logql
+# Success vs failure over the last hour
+sum by (result) (count_over_time(
+  {container="campbuddy-app-1"} | logfmt | event="cart_add" [1h]))
+
+# Why are cart-adds failing?
+sum by (reason) (count_over_time(
+  {container="campbuddy-app-1"} | logfmt
+  | event="cart_add" | result="failure" [24h]))
+
+# Failure ratio (0-1)
+sum(count_over_time({container="campbuddy-app-1"} | logfmt | event="cart_add" | result="failure" [1h]))
+/
+sum(count_over_time({container="campbuddy-app-1"} | logfmt | event="cart_add" | result=~"success|failure" [1h]))
+
+# p95 cart-add latency
+quantile_over_time(0.95,
+  {container="campbuddy-app-1"} | logfmt | event="cart_add"
+  | unwrap duration_ms [1h])
+
+# Everything that failed for one scan
+{container="campbuddy-app-1"} | logfmt | event="cart_add" | scan_id="12" | result="failure"
+```
+
+### Alerting
+
+No Prometheus needed — point a Grafana alert rule at the Loki datasource:
+
+```logql
+sum(count_over_time({container="campbuddy-app-1"} | logfmt
+    | event="cart_add" | result="failure" [15m])) > 3
+```
+
+`reason="login_failed"` is the one worth paging on: it means Recreation.gov
+started rejecting sign-ins, which is how the last outage began. Note that
+cart-adds are sparse (a handful per scan interval), so use `count_over_time`
+windows of 15m or more rather than `rate()`.
+
+If you later want 13-month retention or cheaper wide-range queries, the
+`reason` codes are already low-cardinality and map straight onto
+`cart_add_total{result,reason}` — that needs a `/metrics` endpoint in
+`main.py` plus a scrape config in the Grafana Cloud agent.
 
 ## Prometheus (metrics) — PromQL
 

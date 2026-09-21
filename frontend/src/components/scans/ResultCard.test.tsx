@@ -52,6 +52,17 @@ describe("ResultCard", () => {
     expect(screen.queryByText("Not in cart")).not.toBeInTheDocument();
   });
 
+  it("explains why the cart-add failed when a reason was recorded", () => {
+    render(<ResultCard result={{ ...base, cart_added: false, cart_error: "Add to Cart is disabled for these dates" }} />);
+    expect(screen.getByTitle("Add to Cart is disabled for these dates")).toBeInTheDocument();
+  });
+
+  it("does not claim a reason when the cart-add was never attempted", () => {
+    render(<ResultCard result={{ ...base, cart_added: false, cart_error: null }} />);
+    expect(screen.getByText("Not in cart")).toBeInTheDocument();
+    expect(screen.queryByTitle(/disabled/)).not.toBeInTheDocument();
+  });
+
   it("shows 'Not in cart' badge when cart_added is false", () => {
     render(<ResultCard result={{ ...base, cart_added: false }} />);
     expect(screen.getByText("Not in cart")).toBeInTheDocument();
