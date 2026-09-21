@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useScanFormState } from "./useScanFormState";
-import { ProviderSitesFields, DatesFiltersFields, NotificationsFields, windowNights } from "./ScanForm";
+import { ProviderSitesFields, NotificationsFields } from "./ScanForm";
+import { DatesFiltersFields, windowNights } from "./DatesFiltersFields";
 import { Button } from "../ui/Button";
 import { useUpdateScan } from "../../hooks/useScans";
 import { useAuth } from "../../contexts/AuthContext";

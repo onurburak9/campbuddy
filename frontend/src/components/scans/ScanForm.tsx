@@ -5,12 +5,10 @@ import { Select } from "../ui/Select";
 import { SearchSelect } from "../ui/SearchSelect";
 import { Badge } from "../ui/Badge";
 import { Toggle } from "../ui/Toggle";
-import { Button } from "../ui/Button";
 import { PROVIDERS } from "../../types";
 import { search } from "../../api/search";
 import type { RecreationAreaResult, CampgroundResult } from "../../api/search";
-import type { ScanFormState, SelectedItem } from "./useScanFormState";
-import type { SearchWindow } from "../../types";
+import type { ScanFormState, SelectedItem, Setter } from "./useScanFormState";
 import { formatInterval } from "../../lib/format";
 
 // SearchSelect's generic is inferred as SelectedItem (id/name only) from the
@@ -43,21 +41,6 @@ function CampgroundResultRow({ item }: { item: SelectedItem }) {
       <Badge tone="neutral">ID {full.id}</Badge>
     </div>
   );
-}
-
-type Setter = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) => void;
-
-const DAYS = [
-  { i: 0, label: "Mon" }, { i: 1, label: "Tue" }, { i: 2, label: "Wed" },
-  { i: 3, label: "Thu" }, { i: 4, label: "Fri" }, { i: 5, label: "Sat" }, { i: 6, label: "Sun" },
-];
-
-export function windowNights(w: SearchWindow): number | null {
-  if (!w.start_date || !w.end_date) return null;
-  const diffDays = Math.round(
-    (new Date(w.end_date).getTime() - new Date(w.start_date).getTime()) / 86_400_000,
-  );
-  return diffDays > 0 ? diffDays : null;
 }
 
 const POLLING_OPTIONS = [
@@ -145,88 +128,6 @@ function useResolveFallbackLabels(
   }, [data]);
 
   return resolved;
-}
-
-export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: Setter }) {
-  const updateWindow = (idx: number, patch: Partial<SearchWindow>) =>
-    set("windows", state.windows.map((w, i) => (i === idx ? { ...w, ...patch } : w)));
-  const addWindow = () => set("windows", [...state.windows, { start_date: "", end_date: "" }]);
-  const removeWindow = (idx: number) => set("windows", state.windows.filter((_, i) => i !== idx));
-  const toggleDay = (d: number) =>
-    set(
-      "daysOfWeek",
-      state.daysOfWeek.includes(d)
-        ? state.daysOfWeek.filter((x) => x !== d)
-        : [...state.daysOfWeek, d],
-    );
-
-  const windowNightCounts = state.windows
-    .map((w) => windowNights(w))
-    .filter((n): n is number => n !== null);
-  const shortestWindowNights = windowNightCounts.length ? Math.min(...windowNightCounts) : null;
-  const nightsExceedWindow = shortestWindowNights !== null && state.nights > shortestWindowNights;
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <span className="block text-sm text-stone-600 dark:text-[#888]">Search windows</span>
-        {state.windows.map((w, i) => (
-          <div key={i} className="flex items-end gap-2">
-            <Input type="date" value={w.start_date}
-              onChange={(e) => updateWindow(i, { start_date: e.target.value })} />
-            <Input type="date" value={w.end_date}
-              onChange={(e) => updateWindow(i, { end_date: e.target.value })} />
-            <Button type="button" variant="ghost" size="sm" onClick={() => removeWindow(i)}>
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button type="button" variant="secondary" size="sm" onClick={addWindow}>
-          + Add window
-        </Button>
-      </div>
-      <Input
-        label="Consecutive nights"
-        type="number"
-        min={1}
-        value={state.nights === 0 ? "" : state.nights}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (raw === "") { set("nights", 0); return; }
-          const parsed = Number(raw);
-          if (Number.isNaN(parsed)) return;
-          set("nights", Math.max(1, parsed));
-        }}
-        onBlur={() => { if (state.nights === 0) set("nights", 1); }}
-      />
-      {nightsExceedWindow && (
-        <p className="text-sm text-[#DC2626]">
-          Consecutive nights ({state.nights}) can't be longer than the shortest search window ({shortestWindowNights} night{shortestWindowNights === 1 ? "" : "s"}).
-        </p>
-      )}
-      <div>
-        <span className="mb-1 block text-sm text-stone-600 dark:text-[#888]">Days of week</span>
-        <div className="flex flex-wrap gap-1.5">
-          {DAYS.map((d) => (
-            <button
-              key={d.i}
-              type="button"
-              onClick={() => toggleDay(d.i)}
-              className={`rounded-full px-3 py-1 text-sm ${
-                state.daysOfWeek.includes(d.i)
-                  ? "bg-forest-600 text-white"
-                  : "bg-sand-100 text-stone-600 dark:bg-[#222] dark:text-[#AAA]"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <Toggle label="Weekends only" checked={state.weekendsOnly}
-        onChange={(v) => set("weekendsOnly", v)} />
-    </div>
-  );
 }
 
 export function NotificationsFields({

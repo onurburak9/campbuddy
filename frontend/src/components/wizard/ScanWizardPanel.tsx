@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useScanFormState } from "../scans/useScanFormState";
-import { ProviderSitesFields, DatesFiltersFields, NotificationsFields, windowNights } from "../scans/ScanForm";
+import { ProviderSitesFields, NotificationsFields } from "../scans/ScanForm";
+import { DatesFiltersFields, windowNights } from "../scans/DatesFiltersFields";
 import { VerticalStepIndicator } from "./VerticalStepIndicator";
 import { Button } from "../ui/Button";
 import { useCreateScan } from "../../hooks/useScans";
