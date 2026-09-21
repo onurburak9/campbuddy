@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import date, datetime
 from pydantic import BaseModel, Field, validator
 from db.models import ScanStatus, ScanOutcome
+from core.availability import EQUIPMENT_TYPES
 import re
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -94,6 +95,7 @@ class ScanCreate(BaseModel):
     nights: int = Field(1, ge=1)
     days_of_week: Optional[List[int]] = None
     weekends_only: bool = False
+    equipment_types: Optional[List[str]] = None
     notify_via_email: bool = True
     notify_via_telegram: bool = False
     notify_on_new_only: bool = True
@@ -111,6 +113,12 @@ class ScanCreate(BaseModel):
             raise ValueError("days_of_week values must be 0-6 (Monday=0, Sunday=6)")
         return v
 
+    @validator("equipment_types", each_item=True)
+    def valid_equipment_type(cls, v):
+        if v not in EQUIPMENT_TYPES:
+            raise ValueError(f"Unknown equipment_type: {v}. Must be one of: {sorted(EQUIPMENT_TYPES)}")
+        return v
+
 
 class ScanUpdate(BaseModel):
     name: Optional[str] = None
@@ -122,6 +130,7 @@ class ScanUpdate(BaseModel):
     nights: Optional[int] = Field(None, ge=1)
     days_of_week: Optional[List[int]] = None
     weekends_only: Optional[bool] = None
+    equipment_types: Optional[List[str]] = None
     notify_via_email: Optional[bool] = None
     notify_via_telegram: Optional[bool] = None
     notify_on_new_only: Optional[bool] = None
@@ -139,6 +148,12 @@ class ScanUpdate(BaseModel):
             raise ValueError("days_of_week values must be 0-6 (Monday=0, Sunday=6)")
         return v
 
+    @validator("equipment_types", each_item=True)
+    def valid_equipment_type(cls, v):
+        if v not in EQUIPMENT_TYPES:
+            raise ValueError(f"Unknown equipment_type: {v}. Must be one of: {sorted(EQUIPMENT_TYPES)}")
+        return v
+
 
 class ScanResponse(BaseModel):
     id: int
@@ -154,6 +169,7 @@ class ScanResponse(BaseModel):
     nights: int
     days_of_week: Optional[List[int]]
     weekends_only: bool
+    equipment_types: Optional[List[str]]
     notify_via_email: bool
     notify_via_telegram: bool
     notify_on_new_only: bool

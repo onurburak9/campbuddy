@@ -23,7 +23,7 @@ const scan: Scan = {
   id: 5, user_id: 1, provider: "RecreationDotGov", name: "Trip", status: "active",
   polling_interval: 600, rec_area_ids: null, campground_ids: [10357105, 10357111],
   campsite_ids: null, search_windows: [{ start_date: "2026-07-03", end_date: "2026-07-05", expired: false }],
-  nights: 2, days_of_week: [4, 5], weekends_only: false, notify_via_email: true,
+  nights: 2, days_of_week: [4, 5], weekends_only: false, equipment_types: null, notify_via_email: true,
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-06-01T00:00:00Z",
 };
 
@@ -50,6 +50,16 @@ describe("ConfigCard", () => {
     expect(screen.getByText(/10 min/)).toBeInTheDocument();     // polling
     expect(screen.getByText(/Email/)).toBeInTheDocument();      // notifications
     expect(screen.getByText("Fri")).toBeInTheDocument();        // day-of-week chip
+  });
+
+  it("shows Any when no equipment types are set", () => {
+    wrap(<ConfigCard scan={scan} />);
+    expect(screen.getByText("Any")).toBeInTheDocument();
+  });
+
+  it("shows equipment type labels when set", () => {
+    wrap(<ConfigCard scan={{ ...scan, equipment_types: ["tent", "horse"] }} />);
+    expect(screen.getByText("Tent, Horse camping")).toBeInTheDocument();
   });
 
   it("renders em-dash for null/empty ID lists", () => {

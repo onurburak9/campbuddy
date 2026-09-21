@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,6 +23,7 @@ def make_scan(**overrides):
     scan.nights = 3
     scan.weekends_only = False
     scan.days_of_week = None
+    scan.equipment_types = None
     for k, v in overrides.items():
         setattr(scan, k, v)
     return scan
@@ -88,6 +90,76 @@ def test_optional_targets_passed_when_set(mocker):
     assert kwargs["campgrounds"] == [12345]
     assert kwargs["campsites"] == [98363]
     assert kwargs["days_of_the_week"] == [5, 6]
+
+
+def test_no_equipment_types_omits_equipment_kwarg(mocker):
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = []
+    mock_cls = MagicMock(return_value=mock_search)
+    patch_provider(mocker, mock_cls)
+
+    check_availability(make_scan())
+
+    assert "equipment" not in mock_cls.call_args.kwargs
+
+
+def test_camply_native_equipment_types_passed_through(mocker):
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = []
+    mock_cls = MagicMock(return_value=mock_search)
+    patch_provider(mocker, mock_cls)
+
+    check_availability(make_scan(equipment_types=["tent", "rv"]))
+
+    equipment = mock_cls.call_args.kwargs["equipment"]
+    assert set(equipment) == {("tent", None), ("rv", None)}
+
+
+def test_horse_equipment_type_not_passed_to_camply(mocker):
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = []
+    mock_cls = MagicMock(return_value=mock_search)
+    patch_provider(mocker, mock_cls)
+
+    check_availability(make_scan(equipment_types=["horse"]))
+
+    assert "equipment" not in mock_cls.call_args.kwargs
+
+
+def test_horse_equipment_type_filters_sites_by_permitted_equipment(mocker):
+    horse_site = MagicMock(permitted_equipment=[SimpleNamespace(equipment_name="Horse", max_length=0.0)])
+    tent_site = MagicMock(permitted_equipment=[SimpleNamespace(equipment_name="Tent", max_length=0.0)])
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = [horse_site, tent_site]
+    patch_provider(mocker, MagicMock(return_value=mock_search))
+
+    result = check_availability(make_scan(equipment_types=["horse"]))
+
+    assert result == [horse_site]
+
+
+def test_sites_missing_permitted_equipment_excluded_when_horse_requested(mocker):
+    no_equipment_site = MagicMock(permitted_equipment=None)
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = [no_equipment_site]
+    patch_provider(mocker, MagicMock(return_value=mock_search))
+
+    result = check_availability(make_scan(equipment_types=["horse"]))
+
+    assert result == []
+
+
+def test_horse_combined_with_native_equipment_type(mocker):
+    horse_site = MagicMock(permitted_equipment=[SimpleNamespace(equipment_name="Horse", max_length=0.0)])
+    mock_search = MagicMock()
+    mock_search.get_matching_campsites.return_value = [horse_site]
+    mock_cls = MagicMock(return_value=mock_search)
+    patch_provider(mocker, mock_cls)
+
+    result = check_availability(make_scan(equipment_types=["tent", "horse"]))
+
+    assert mock_cls.call_args.kwargs["equipment"] == [("tent", None)]
+    assert result == [horse_site]
 
 
 def test_unsupported_provider_raises():

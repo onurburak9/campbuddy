@@ -25,6 +25,27 @@ describe("useScanFormState", () => {
     expect(payload.campsite_ids).toBeNull();
   });
 
+  it("omits equipment_types as null when none are selected", () => {
+    const { result } = renderHook(() => useScanFormState());
+    const payload = result.current.toScanCreatePayload();
+    expect(payload.equipment_types).toBeNull();
+  });
+
+  it("includes selected equipment_types in the create payload", () => {
+    const { result } = renderHook(() => useScanFormState());
+    act(() => {
+      result.current.set("equipmentTypes", ["tent", "horse"]);
+    });
+    const payload = result.current.toScanCreatePayload();
+    expect(payload.equipment_types).toEqual(["tent", "horse"]);
+  });
+
+  it("pre-fills equipmentTypes from an existing scan", () => {
+    const scan = { equipment_types: ["rv"] } as unknown as Scan;
+    const { result } = renderHook(() => useScanFormState(scan));
+    expect(result.current.state.equipmentTypes).toEqual(["rv"]);
+  });
+
   it("pre-fills id fields from an existing scan with a fallback 'ID {n}' label", () => {
     const scan = {
       rec_area_ids: [2991],

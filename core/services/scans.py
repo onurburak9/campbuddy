@@ -12,7 +12,7 @@ def _now():
 _UPDATABLE = {
     "name", "polling_interval", "rec_area_ids", "campground_ids",
     "campsite_ids", "search_windows", "nights", "days_of_week",
-    "weekends_only", "notify_via_email", "notify_via_telegram",
+    "weekends_only", "equipment_types", "notify_via_email", "notify_via_telegram",
     "notify_on_new_only", "auto_book",
 }
 

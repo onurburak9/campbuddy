@@ -7,7 +7,7 @@ const scan: Scan = {
   id: 7, user_id: 1, provider: "RecreationDotGov", name: "October trip", status: "active",
   polling_interval: 1800, rec_area_ids: [2991], campground_ids: null, campsite_ids: null,
   search_windows: [{ start_date: "2026-10-01", end_date: "2026-11-01", expired: false }],
-  nights: 2, days_of_week: null, weekends_only: true, notify_via_email: true,
+  nights: 2, days_of_week: null, weekends_only: true, equipment_types: null, notify_via_email: true,
   notify_via_telegram: false, notify_on_new_only: true, created_at: "2026-09-20T00:00:00Z",
 };
 

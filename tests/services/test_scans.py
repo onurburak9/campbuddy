@@ -109,6 +109,21 @@ def test_update_scan_changes_fields(db):
     assert updated.name == "Yosemite"
 
 
+def test_create_scan_persists_equipment_types(db):
+    u = make_user(db)
+    scan = create_scan(db, u.id, {"search_windows": WINDOWS, "equipment_types": ["tent", "horse"]})
+    assert scan.equipment_types == ["tent", "horse"]
+
+
+def test_update_scan_changes_equipment_types(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    updated = update_scan(db, scan.id, u.id, {"equipment_types": ["rv"]})
+    assert updated.equipment_types == ["rv"]
+
+
 def test_update_scan_ignores_disallowed_fields(db):
     u = make_user(db)
     scan = Scan(user_id=u.id, search_windows=WINDOWS)

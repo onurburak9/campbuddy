@@ -88,6 +88,26 @@ def test_create_scan_rejects_invalid_day_of_week(auth_client):
     assert resp.status_code == 422
 
 
+def test_create_scan_accepts_equipment_types(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "equipment_types": ["tent", "horse"]})
+    assert resp.status_code == 201
+    assert resp.json()["equipment_types"] == ["tent", "horse"]
+
+
+def test_create_scan_defaults_equipment_types_to_null(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS})
+    assert resp.status_code == 201
+    assert resp.json()["equipment_types"] is None
+
+
+def test_create_scan_rejects_invalid_equipment_type(auth_client):
+    client, _ = auth_client
+    resp = client.post("/api/v1/scans", json={"search_windows": WINDOWS, "equipment_types": ["unicycle"]})
+    assert resp.status_code == 422
+
+
 def test_get_scan_returns_scan(auth_client):
     client, info = auth_client
     scan_id = _make_scan(info["id"])
@@ -120,6 +140,21 @@ def test_update_scan_changes_nights(auth_client):
     resp = client.patch(f"/api/v1/scans/{scan_id}", json={"nights": 3})
     assert resp.status_code == 200
     assert resp.json()["nights"] == 3
+
+
+def test_update_scan_changes_equipment_types(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"equipment_types": ["rv"]})
+    assert resp.status_code == 200
+    assert resp.json()["equipment_types"] == ["rv"]
+
+
+def test_update_scan_rejects_invalid_equipment_type(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.patch(f"/api/v1/scans/{scan_id}", json={"equipment_types": ["unicycle"]})
+    assert resp.status_code == 422
 
 
 def test_patch_scan_ignores_status_field(auth_client):

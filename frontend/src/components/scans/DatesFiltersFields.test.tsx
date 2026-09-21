@@ -16,6 +16,7 @@ function makeState(): ScanFormState {
     nights: 1,
     daysOfWeek: [],
     weekendsOnly: false,
+    equipmentTypes: [],
     pollingInterval: 300,
     notifyEmail: true,
     notifyTelegram: false,
@@ -275,5 +276,31 @@ describe("DatesFiltersFields — guidance", () => {
   it("explains that Search until is the check-out day, not the last night", () => {
     render(<ControlledDatesFilters initial={{ windows: [{ start_date: "", end_date: "" }] }} />);
     expect(screen.getByTitle(/check out|last night/i)).toBeInTheDocument();
+  });
+});
+
+describe("DatesFiltersFields — equipment types", () => {
+  it("toggles an equipment type on click and back off on a second click", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+    const horseButton = screen.getByRole("button", { name: "Horse camping" });
+
+    await user.click(horseButton);
+    expect(horseButton).toHaveClass("bg-forest-600");
+
+    await user.click(horseButton);
+    expect(horseButton).not.toHaveClass("bg-forest-600");
+  });
+
+  it("supports selecting more than one equipment type independently", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.click(screen.getByRole("button", { name: "Tent" }));
+    await user.click(screen.getByRole("button", { name: "RV" }));
+
+    expect(screen.getByRole("button", { name: "Tent" })).toHaveClass("bg-forest-600");
+    expect(screen.getByRole("button", { name: "RV" })).toHaveClass("bg-forest-600");
+    expect(screen.getByRole("button", { name: "Trailer" })).not.toHaveClass("bg-forest-600");
   });
 });

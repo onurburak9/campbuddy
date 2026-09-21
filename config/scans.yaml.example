@@ -13,6 +13,7 @@ scans:
       - start_date: "2026-07-16"
         end_date: "2026-07-18"
     nights: 2
+    # equipment_types: [tent, rv]   # optional; one or more of tent, rv, trailer, vehicle, horse — omit for no filter
     notify_via_email: true
     notify_via_telegram: false
     notify_on_new_only: true
