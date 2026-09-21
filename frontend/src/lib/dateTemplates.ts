@@ -40,11 +40,14 @@ function weekendWindow(friday: Date): SearchWindow {
 function monthWindow(monthKey: string, now: Date): SearchWindow {
   const [year, month] = monthKey.split("-").map(Number);
   const first = new Date(year, month - 1, 1);
-  const last = new Date(year, month, 0);
+  // end_date is the check-out day, not a night: camply's get_date_range() is
+  // exclusive of it. Checking out on the 1st of the next month is what makes
+  // the month's final night - and so its final weekend - searchable at all.
+  const checkout = new Date(year, month, 1);
   const today = startOfDay(now);
   return {
     start_date: toISODate(first < today ? today : first),
-    end_date: toISODate(last),
+    end_date: toISODate(checkout),
   };
 }
 
@@ -86,11 +89,10 @@ export function upcomingMonths(
   now: Date,
   count = 12,
 ): { key: string; label: string; name: string }[] {
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  // Offer the current month only while a full night still fits inside it.
-  const offset = now.getDate() >= lastDay ? 1 : 0;
+  // The current month always stays on offer: its start clamps to today and it
+  // checks out on the 1st of the next month, so even its last day is one night.
   return Array.from({ length: count }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset + i, 1);
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     return {
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
       label: d.toLocaleDateString(undefined, { month: "long", year: "numeric" }),

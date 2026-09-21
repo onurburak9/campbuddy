@@ -115,7 +115,7 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
     await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
     await user.click(screen.getByRole("button", { name: "All of October" }));
 
-    expect(dateValues(container)).toEqual(["2026-10-01", "2026-10-31"]);
+    expect(dateValues(container)).toEqual(["2026-10-01", "2026-11-01"]);
     expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "false");
   });
 
@@ -126,7 +126,7 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
     await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
     await user.click(screen.getByRole("button", { name: "Weekends in October" }));
 
-    expect(dateValues(container)).toEqual(["2026-10-01", "2026-10-31"]);
+    expect(dateValues(container)).toEqual(["2026-10-01", "2026-11-01"]);
     expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByLabelText("Consecutive nights")).toHaveValue(2);
   });
@@ -137,7 +137,7 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
 
     await user.click(screen.getByRole("button", { name: "All of September" }));
 
-    expect(dateValues(container)).toEqual(["2026-09-20", "2026-09-30"]);
+    expect(dateValues(container)).toEqual(["2026-09-20", "2026-10-01"]);
   });
 
   it("replaces existing windows and filters instead of appending to them", async () => {
@@ -170,5 +170,62 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
     await user.type(start, "2026-09-24");
 
     expect(dateValues(container)).toEqual(["2026-09-24", "2026-09-27"]);
+  });
+});
+
+describe("DatesFiltersFields — search summary and window labels", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 20, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("shows no summary until a window is complete", () => {
+    render(<ControlledDatesFilters initial={{}} />);
+    expect(screen.queryByTestId("search-summary")).not.toBeInTheDocument();
+  });
+
+  it("summarises a month template in nights, never showing the exclusive end date", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
+    await user.click(screen.getByRole("button", { name: "All of October" }));
+
+    const summary = screen.getByTestId("search-summary");
+    expect(summary).toHaveTextContent("Any 1 night between Oct 1 and Oct 31, 2026");
+    expect(summary).not.toHaveTextContent("Nov");
+  });
+
+  it("keeps the summary in step when the nights preference is edited afterwards", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
+    await user.click(screen.getByRole("button", { name: "All of October" }));
+    const nights = screen.getByLabelText("Consecutive nights");
+    await user.clear(nights);
+    await user.type(nights, "3");
+
+    expect(screen.getByTestId("search-summary")).toHaveTextContent("Any 3 nights between Oct 1 and Oct 31, 2026");
+  });
+
+  it("describes a weekend template as a Fri-Sun weekend", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.click(screen.getByRole("button", { name: "Next weekend" }));
+
+    expect(screen.getByTestId("search-summary")).toHaveTextContent("2 nights — Sep 25 to Sep 27, 2026");
+  });
+
+  it("labels the window dates as a range rather than a booking", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.click(screen.getByRole("button", { name: "Next weekend" }));
+
+    expect(screen.getByLabelText("Search from")).toHaveValue("2026-09-25");
+    expect(screen.getByLabelText("Search until")).toHaveValue("2026-09-27");
   });
 });

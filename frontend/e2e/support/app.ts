@@ -62,7 +62,9 @@ export async function openWizard(page: Page) {
   await page.goto("/");
   // Targeted by data-tour rather than name: "New scan" also substring-matches
   // the empty-state's "+ New Scan" button once the scan list has loaded.
-  await page.locator('[data-tour="new-scan-button"]').click();
+  const newScan = page.locator('[data-tour="new-scan-button"]');
+  await newScan.waitFor();
+  await newScan.click();
 }
 
 /** Completes step 1 (Provider & Sites) by adding a recreation area by ID. */

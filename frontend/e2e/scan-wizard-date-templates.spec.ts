@@ -51,9 +51,11 @@ test.describe("scan wizard — quick-pick date templates", () => {
     await monthSelect.selectOption(nextMonth!);
     await page.getByRole("button", { name: /^All of / }).click();
 
+    // Checks out on the 1st of the following month so the month's last night counts.
     const [year, month] = nextMonth!.split("-").map(Number);
-    const lastDay = new Date(year, month, 0).getDate();
-    expect(await dateValues(page)).toEqual([`${nextMonth}-01`, `${nextMonth}-${lastDay}`]);
+    const checkout = new Date(year, month, 1);
+    const checkoutIso = `${checkout.getFullYear()}-${String(checkout.getMonth() + 1).padStart(2, "0")}-01`;
+    expect(await dateValues(page)).toEqual([`${nextMonth}-01`, checkoutIso]);
     await expect(page.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "false");
   });
 
@@ -66,6 +68,30 @@ test.describe("scan wizard — quick-pick date templates", () => {
     expect(await dateValues(page)).toHaveLength(2);
     await expect(page.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Consecutive nights")).toHaveValue("2");
+  });
+
+  test("summarises the config in nights, never surfacing the exclusive end date", async ({ page }) => {
+    const monthSelect = page.getByLabel("Month");
+    const nextMonth = await monthSelect.locator("option").nth(1).getAttribute("value");
+    await monthSelect.selectOption(nextMonth!);
+    await page.getByRole("button", { name: /^All of / }).click();
+
+    const summary = page.getByTestId("search-summary");
+    await expect(summary).toContainText(/^Any 1 night between /);
+    // The window's end_date is the 1st of the following month; the summary must
+    // talk about the last bookable night instead.
+    const [year, month] = nextMonth!.split("-").map(Number);
+    const followingMonth = new Date(year, month, 1).toLocaleDateString("en-US", { month: "short" });
+    await expect(summary).not.toContainText(followingMonth);
+  });
+
+  test("keeps the summary in step when nights is edited after applying a template", async ({ page }) => {
+    await page.getByRole("button", { name: "Next weekend" }).click();
+    await expect(page.getByTestId("search-summary")).toContainText("2 nights");
+
+    await page.getByLabel("Consecutive nights").fill("1");
+
+    await expect(page.getByTestId("search-summary")).toContainText("Any 1 night between ");
   });
 
   test("applying a template replaces the existing windows rather than appending", async ({ page }) => {
