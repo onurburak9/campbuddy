@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  anyWeekendNightInMonth,
   nextWeekend,
   nextTwoWeekends,
   upcomingMonths,
@@ -125,6 +126,23 @@ describe("weekendsInMonth", () => {
 
   it("clamps the current month's start to today", () => {
     expect(weekendsInMonth("2026-09", SUN_SEP_20).windows).toEqual([
+      { start_date: "2026-09-20", end_date: "2026-10-01" },
+    ]);
+  });
+});
+
+describe("anyWeekendNightInMonth", () => {
+  it("keeps the weekends-only filter but drops to a single night", () => {
+    expect(anyWeekendNightInMonth("2026-10", SUN_SEP_20)).toEqual({
+      windows: [{ start_date: "2026-10-01", end_date: "2026-11-01" }],
+      nights: 1,
+      weekendsOnly: true,
+      daysOfWeek: [],
+    });
+  });
+
+  it("clamps the current month's start to today", () => {
+    expect(anyWeekendNightInMonth("2026-09", SUN_SEP_20).windows).toEqual([
       { start_date: "2026-09-20", end_date: "2026-10-01" },
     ]);
   });

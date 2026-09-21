@@ -85,6 +85,12 @@ export function weekendsInMonth(monthKey: string, now: Date): DateTemplateResult
   };
 }
 
+// Same weekend restriction, but one night: catches the single-night
+// cancellations that a 2-night Fri+Sat requirement silently skips over.
+export function anyWeekendNightInMonth(monthKey: string, now: Date): DateTemplateResult {
+  return { windows: [monthWindow(monthKey, now)], nights: 1, weekendsOnly: true, daysOfWeek: [] };
+}
+
 export function upcomingMonths(
   now: Date,
   count = 12,

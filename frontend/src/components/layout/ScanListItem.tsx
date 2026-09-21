@@ -1,6 +1,6 @@
 import { cn } from "../../lib/cn";
 import { StatusDot } from "../ui/StatusDot";
-import { dateRange } from "../../lib/format";
+import { describeSearchShort } from "../../lib/describeSearch";
 import type { Scan, ScanStatus } from "../../types";
 
 export function scanTitle(scan: Scan): string {
@@ -18,7 +18,7 @@ export function scanStatusTone(status: ScanStatus): "success" | "warning" | "neu
 export function ScanListItem({ scan, selected, onClick }: {
   scan: Scan; selected: boolean; onClick: () => void;
 }) {
-  const window = scan.search_windows[0];
+  const summary = describeSearchShort(scan.search_windows, scan.nights, scan.weekends_only);
   return (
     <button
       onClick={onClick}
@@ -35,9 +35,9 @@ export function ScanListItem({ scan, selected, onClick }: {
           {scanTitle(scan)}
         </span>
       </span>
-      {window && (
+      {summary && (
         <span className="pl-4 text-xs text-stone-500 dark:text-[#888]">
-          {dateRange(window.start_date, window.end_date)}
+          {summary}
         </span>
       )}
     </button>

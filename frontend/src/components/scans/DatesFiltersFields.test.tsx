@@ -229,3 +229,25 @@ describe("DatesFiltersFields — search summary and window labels", () => {
     expect(screen.getByLabelText("Search until")).toHaveValue("2026-09-27");
   });
 });
+
+describe("DatesFiltersFields — single weekend night template", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 20, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps weekends-only but drops to one night, catching single-night openings", async () => {
+    const user = userEvent.setup();
+    render(<ControlledDatesFilters initial={{}} />);
+
+    await user.selectOptions(screen.getByLabelText("Month"), "2026-10");
+    await user.click(screen.getByRole("button", { name: "Any Fri/Sat night in October" }));
+
+    expect(screen.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByLabelText("Consecutive nights")).toHaveValue(1);
+    expect(screen.getByTestId("search-summary")).toHaveTextContent(
+      "Any Fri or Sat night between Oct 1 and Oct 31, 2026",
+    );
+  });
+});
