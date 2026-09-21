@@ -4,7 +4,8 @@ import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import { Button } from "../ui/Button";
 import type { ScanFormState, Setter } from "./useScanFormState";
-import type { SearchWindow } from "../../types";
+import type { EquipmentType, SearchWindow } from "../../types";
+import { EQUIPMENT_TYPE_OPTIONS } from "../../lib/equipmentTypes";
 import {
   anyWeekendNightInMonth,
   nextTwoWeekends,
@@ -84,6 +85,13 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
       state.daysOfWeek.includes(d)
         ? state.daysOfWeek.filter((x) => x !== d)
         : [...state.daysOfWeek, d],
+    );
+  const toggleEquipmentType = (t: EquipmentType) =>
+    set(
+      "equipmentTypes",
+      state.equipmentTypes.includes(t)
+        ? state.equipmentTypes.filter((x) => x !== t)
+        : [...state.equipmentTypes, t],
     );
 
   const windowNightCounts = state.windows
@@ -181,6 +189,28 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
       </div>
       <Toggle label="Weekends only" checked={state.weekendsOnly}
         onChange={(v) => set("weekendsOnly", v)} />
+      <div>
+        <span className="mb-1 block text-sm text-stone-600 dark:text-[#888]">Equipment</span>
+        <div className="flex flex-wrap gap-1.5">
+          {EQUIPMENT_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleEquipmentType(opt.value)}
+              className={`rounded-full px-3 py-1 text-sm ${
+                state.equipmentTypes.includes(opt.value)
+                  ? "bg-forest-600 text-white"
+                  : "bg-sand-100 text-stone-600 dark:bg-[#222] dark:text-[#AAA]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-stone-400 dark:text-[#666]">
+          Leave empty to match any equipment type.
+        </p>
+      </div>
     </div>
   );
 }

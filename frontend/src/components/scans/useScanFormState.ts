@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { Scan, ScanCreatePayload, ScanUpdatePayload, SearchWindow } from "../../types";
+import type { EquipmentType, Scan, ScanCreatePayload, ScanUpdatePayload, SearchWindow } from "../../types";
 
 export interface SelectedItem {
   id: number;
@@ -16,6 +16,7 @@ export interface ScanFormState {
   nights: number;
   daysOfWeek: number[];
   weekendsOnly: boolean;
+  equipmentTypes: EquipmentType[];
   pollingInterval: number;
   notifyEmail: boolean;
   notifyTelegram: boolean;
@@ -39,6 +40,7 @@ function fromScan(scan?: Scan): ScanFormState {
     nights: scan?.nights ?? 1,
     daysOfWeek: scan?.days_of_week ?? [],
     weekendsOnly: scan?.weekends_only ?? false,
+    equipmentTypes: scan?.equipment_types ?? [],
     pollingInterval: scan?.polling_interval ?? 300,
     notifyEmail: scan?.notify_via_email ?? true,
     notifyTelegram: scan?.notify_via_telegram ?? false,
@@ -64,6 +66,7 @@ export function useScanFormState(scan?: Scan) {
     nights: Math.max(1, state.nights),
     days_of_week: state.daysOfWeek.length ? state.daysOfWeek : null,
     weekends_only: state.weekendsOnly,
+    equipment_types: state.equipmentTypes.length ? state.equipmentTypes : null,
     notify_via_email: state.notifyEmail,
     notify_via_telegram: state.notifyTelegram,
     notify_on_new_only: state.notifyNewOnly,

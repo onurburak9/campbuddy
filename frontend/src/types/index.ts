@@ -1,5 +1,6 @@
 export type ScanStatus = "active" | "paused" | "completed";
 export type RunOutcome = "success" | "no_results" | "error";
+export type EquipmentType = "tent" | "rv" | "trailer" | "vehicle" | "horse";
 
 export interface User {
   id: number;
@@ -43,6 +44,7 @@ export interface Scan {
   nights: number;
   days_of_week: number[] | null;
   weekends_only: boolean;
+  equipment_types: EquipmentType[] | null;
   notify_via_email: boolean;
   notify_via_telegram: boolean;
   notify_on_new_only: boolean;
@@ -91,6 +93,7 @@ export interface ScanCreatePayload {
   nights: number;
   days_of_week?: number[] | null;
   weekends_only: boolean;
+  equipment_types?: EquipmentType[] | null;
   notify_via_email: boolean;
   notify_via_telegram: boolean;
   notify_on_new_only: boolean;

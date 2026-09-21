@@ -1,5 +1,6 @@
 import { dateRange, formatInterval } from "../../lib/format";
 import { describeSearch } from "../../lib/describeSearch";
+import { EQUIPMENT_TYPE_LABELS } from "../../lib/equipmentTypes";
 import { cn } from "../../lib/cn";
 import { search } from "../../api/search";
 import { useResolvedNames } from "../../hooks/useResolvedNames";
@@ -139,6 +140,11 @@ export function ConfigCard({ scan }: { scan: Scan }) {
           )}
         </Row>
         <Row label="Weekends only">{scan.weekends_only ? "Yes" : "No"}</Row>
+        <Row label="Equipment">
+          {scan.equipment_types && scan.equipment_types.length
+            ? scan.equipment_types.map((t) => EQUIPMENT_TYPE_LABELS[t]).join(", ")
+            : "Any"}
+        </Row>
         <Row label="Polling">every {formatInterval(scan.polling_interval)}</Row>
         <Row label="Notifications">{notifs}</Row>
       </div>

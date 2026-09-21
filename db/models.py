@@ -127,6 +127,7 @@ class Scan(Base):
     nights: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     days_of_week: Mapped[Optional[list[int]]] = mapped_column(JSON, nullable=True)
     weekends_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    equipment_types: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     notify_via_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_via_telegram: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notify_on_new_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

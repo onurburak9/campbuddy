@@ -82,6 +82,7 @@ def seed(yaml_path: str):
                 nights=s.get("nights", 1),
                 days_of_week=s.get("days_of_week"),
                 weekends_only=s.get("weekends_only", False),
+                equipment_types=s.get("equipment_types"),
                 notify_via_email=s.get("notify_via_email", True),
                 notify_via_telegram=s.get("notify_via_telegram", False),
                 notify_on_new_only=s.get("notify_on_new_only", True),

@@ -33,6 +33,7 @@ function makeState(pollingInterval: number): ScanFormState {
     nights: 1,
     daysOfWeek: [],
     weekendsOnly: false,
+    equipmentTypes: [],
     pollingInterval,
     notifyEmail: true,
     notifyTelegram: false,
