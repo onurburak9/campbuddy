@@ -16,3 +16,8 @@ build/
 .superpowers/sdd/
 frontend/node_modules
 frontend/dist
+
+# Playwright
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/blob-report/

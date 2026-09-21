@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -23,6 +23,14 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("ScanWizardPanel", () => {
+  // Date fixtures below are relative to this instant; pinning the clock keeps
+  // them from silently drifting into the past as real time passes.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
   beforeEach(() => {
     // Adding an id via the fallback "Add by ID" input triggers a resolve-on-mount
     // request for its real name; stub it so tests don't hit an unhandled request.
@@ -111,5 +119,35 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(screen.queryByRole("button", { name: /show tips for this step/i })).not.toBeInTheDocument();
+  });
+
+  it("blocks advancing past the dates step when no search window has been added", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(screen.getByText(/add at least one search window with start and end dates/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
+  });
+
+  it("blocks advancing past the dates step when every window has already ended", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add window/i }));
+    const dates = screen.getAllByDisplayValue("");
+    await userEvent.type(dates[0], "2026-04-01");
+    await userEvent.type(dates[1], "2026-04-03");
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(screen.getByText(/at least one search window must end today or later/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
   });
 });
