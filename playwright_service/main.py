@@ -1,13 +1,28 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from playwright_service.browser import add_to_cart, add_to_cart_batch
+from playwright_service.browser import add_to_cart, add_to_cart_batch, shutdown_browser
 
 logging.basicConfig(level=logging.INFO)
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    # The shared headed Chromium keeps the container alive otherwise — Docker
+    # reports "did not receive an exit event" and the container becomes
+    # unkillable without restarting the daemon. Run off the event loop: this
+    # waits on the browser thread and must not block the loop uvicorn is
+    # using to finish its own shutdown.
+    await asyncio.to_thread(shutdown_browser)
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 class CartRequest(BaseModel):

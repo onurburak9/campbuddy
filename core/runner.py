@@ -165,12 +165,21 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
             return
 
         pw = decrypt_password(user.recreationgov_password, settings.encryption_key)
-        sites_payload = [s for _, _, s in new_items]
+        # Each add places a real 15-minute hold on a live campsite, and the
+        # sidecar works through them one at a time — a popular campground can
+        # free up dozens of sites at once, so only the first few are carted.
+        cart_items = new_items[: settings.cart_add_max_sites]
+        if len(new_items) > len(cart_items):
+            logger.info(
+                "Scan %d: carting %d of %d new sites (cart_add_max_sites=%d)",
+                scan_id, len(cart_items), len(new_items), settings.cart_add_max_sites,
+            )
+        sites_payload = [s for _, _, s in cart_items]
         results = attempt_cart_add_batch(sites_payload, user.recreationgov_email, pw, settings)
 
         now = _now()
         with get_db(session_factory) as db:
-            for (rid, payload, _), res in zip(new_items, results):
+            for (rid, payload, _), res in zip(cart_items, results):
                 carted = bool(res.get("success"))
                 payload.cart_added = carted
                 row = db.query(ScanResult).filter(ScanResult.id == rid).first()

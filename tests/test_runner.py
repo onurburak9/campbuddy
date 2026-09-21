@@ -19,6 +19,7 @@ def settings():
     s = MagicMock()
     s.encryption_key = "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXQ="
     s.playwright_service_url = "http://playwright:8001"
+    s.cart_add_max_sites = 5
     return s
 
 
@@ -304,6 +305,62 @@ def test_sidecar_unhealthy_notifies_unavailable_and_skips_cartadd(factory, scan_
     batch.assert_not_called()
     cart_results.assert_called_once()
     assert cart_results.call_args.kwargs["sidecar_available"] is False
+
+
+def _enable_autobook(factory, scan_id):
+    with factory() as db:
+        db.query(Scan).filter(Scan.id == scan_id).update({"auto_book": True})
+        db.commit()
+
+
+def _many_sites(n):
+    return [make_site(campsite_id=str(1000 + i)) for i in range(n)]
+
+
+def test_cart_add_is_capped_at_the_configured_maximum(factory, scan_id, settings, mocker):
+    """Acorn alone returns 69 free sites; each add places a real 15-minute hold."""
+    settings.cart_add_max_sites = 3
+    _enable_autobook(factory, scan_id)
+    mocker.patch("core.runner.check_availability", return_value=_many_sites(12))
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.notify_cart_results")
+    batch = mocker.patch("core.runner.attempt_cart_add_batch",
+                         return_value=[{"success": True, "error": None}] * 3)
+    run_scan(scan_id, factory, settings)
+    assert len(batch.call_args.args[0]) == 3
+
+
+def test_sites_beyond_the_cap_are_not_marked_as_carted(factory, scan_id, settings, mocker):
+    settings.cart_add_max_sites = 3
+    _enable_autobook(factory, scan_id)
+    mocker.patch("core.runner.check_availability", return_value=_many_sites(12))
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.notify_cart_results")
+    mocker.patch("core.runner.attempt_cart_add_batch",
+                 return_value=[{"success": True, "error": None}] * 3)
+    run_scan(scan_id, factory, settings)
+    with factory() as db:
+        rows = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).all()
+        assert sum(1 for r in rows if r.cart_added) == 3
+        assert len(rows) == 12
+
+
+def test_every_found_site_is_still_notified_when_cart_add_is_capped(factory, scan_id, settings, mocker):
+    settings.cart_add_max_sites = 3
+    _enable_autobook(factory, scan_id)
+    mocker.patch("core.runner.check_availability", return_value=_many_sites(12))
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.attempt_cart_add_batch",
+                 return_value=[{"success": True, "error": None}] * 3)
+    cart_results = mocker.patch("core.runner.notify_cart_results")
+    run_scan(scan_id, factory, settings)
+    assert len(cart_results.call_args.args[1]) == 12
 
 
 def test_notified_only_set_on_available_success(factory, scan_id, settings, mocker):

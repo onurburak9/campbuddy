@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     smtp_from: str
     telegram_bot_token: str = ""
     playwright_service_url: str = "http://playwright:8001"
+    # Each cart-add places a real 15-minute hold on a live campsite and the
+    # sidecar processes them sequentially, so cap how many one scan may take.
+    cart_add_max_sites: int = 5
     database_url: str = "sqlite:///./data/campbuddy.db"
     api_secret_key: str = ""
     cookie_secure: bool = False
@@ -26,6 +29,12 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    @validator("cart_add_max_sites")
+    def _at_least_one_site(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("CART_ADD_MAX_SITES must be at least 1")
+        return v
 
     @validator("encryption_key")
     def _valid_fernet_key(cls, v: str) -> str:
