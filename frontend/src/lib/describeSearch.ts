@@ -33,6 +33,7 @@ function span(from: string, to: string): string {
 
 function qualifier(nights: number, weekendsOnly: boolean, daysOfWeek: number[]): string {
   if (weekendsOnly) {
+    if (nights === 1) return "";
     return nights === WEEKEND_NIGHTS ? " over a Fri–Sun weekend" : " on Fri/Sat nights";
   }
   if (daysOfWeek.length > 0) {
@@ -51,7 +52,9 @@ export function describeSearch(
   const complete = windows.filter((w) => w.start_date && w.end_date && w.end_date > w.start_date);
   if (complete.length === 0) return null;
 
-  const unit = `${nights} night${nights === 1 ? "" : "s"}`;
+  // "1 night on Fri/Sat nights" reads badly; name the night instead.
+  const unit =
+    weekendsOnly && nights === 1 ? "Fri or Sat night" : `${nights} night${nights === 1 ? "" : "s"}`;
   const extra = qualifier(nights, weekendsOnly, daysOfWeek);
 
   if (complete.length > 1) {
@@ -71,4 +74,29 @@ export function describeSearch(
 
   const separator = extra ? ", between " : " between ";
   return `Any ${unit}${extra}${separator}${span(only.start_date, lastNight(only.end_date))}`;
+}
+
+/** Sidebar-width variant: a date range plus the stay length. */
+export function describeSearchShort(
+  windows: SearchWindow[],
+  nights: number,
+  weekendsOnly: boolean,
+): string | null {
+  const complete = windows.filter((w) => w.start_date && w.end_date && w.end_date > w.start_date);
+  if (complete.length === 0) return null;
+
+  const [first] = complete;
+  const windowNights = Math.round(
+    (atNoon(first.end_date).getTime() - atNoon(first.start_date).getTime()) / 86_400_000,
+  );
+  // Only show the raw end when it is genuinely the check-out day of the stay.
+  const to = windowNights === nights ? first.end_date : lastNight(first.end_date);
+
+  const parts = [
+    `${fmt(first.start_date, false)} – ${fmt(to, false)}`,
+    `${nights} night${nights === 1 ? "" : "s"}`,
+  ];
+  if (weekendsOnly) parts.push("weekends");
+  const extra = complete.length > 1 ? ` +${complete.length - 1} more` : "";
+  return `${parts.join(" · ")}${extra}`;
 }

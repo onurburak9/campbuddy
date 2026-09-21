@@ -94,6 +94,17 @@ test.describe("scan wizard — quick-pick date templates", () => {
     await expect(page.getByTestId("search-summary")).toContainText("Any 1 night between ");
   });
 
+  test("'Any Fri/Sat night' keeps weekends-only but searches single nights", async ({ page }) => {
+    const monthSelect = page.getByLabel("Month");
+    const nextMonth = await monthSelect.locator("option").nth(1).getAttribute("value");
+    await monthSelect.selectOption(nextMonth!);
+    await page.getByRole("button", { name: /^Any Fri\/Sat night in / }).click();
+
+    await expect(page.getByRole("switch", { name: "Weekends only" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByLabel("Consecutive nights")).toHaveValue("1");
+    await expect(page.getByTestId("search-summary")).toContainText("Any Fri or Sat night between");
+  });
+
   test("applying a template replaces the existing windows rather than appending", async ({ page }) => {
     await page.getByRole("button", { name: "Next 2 weekends" }).click();
     expect(await dateValues(page)).toHaveLength(4);

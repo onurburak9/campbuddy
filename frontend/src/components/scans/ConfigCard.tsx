@@ -1,4 +1,5 @@
 import { dateRange, formatInterval } from "../../lib/format";
+import { describeSearch } from "../../lib/describeSearch";
 import { cn } from "../../lib/cn";
 import { search } from "../../api/search";
 import { useResolvedNames } from "../../hooks/useResolvedNames";
@@ -73,6 +74,12 @@ export function ConfigCard({ scan }: { scan: Scan }) {
       .filter(Boolean)
       .join(" · ") || "None";
   const summary = targetSummary(scan);
+  const searchSummary = describeSearch(
+    scan.search_windows,
+    scan.nights,
+    scan.weekends_only,
+    scan.days_of_week ?? [],
+  );
 
   const recAreaNames = useResolvedNames(scan.rec_area_ids ?? [], search.resolveRecreationAreas);
   const campgroundNames = useResolvedNames(scan.campground_ids ?? [], search.resolveCampgrounds);
@@ -82,14 +89,19 @@ export function ConfigCard({ scan }: { scan: Scan }) {
     <div className="rounded-lg border border-sand-200 bg-white p-5 dark:border-[#222] dark:bg-[#1A1A1A]">
       <h3 className="mb-3 text-sm font-semibold text-stone-800 dark:text-[#EEE]">Configuration</h3>
       {summary && (
-        <p className="mb-3 text-sm text-stone-600 dark:text-[#AAA]">{summary}</p>
+        <p className="mb-1 text-sm text-stone-600 dark:text-[#AAA]">{summary}</p>
+      )}
+      {searchSummary && (
+        <p data-testid="config-search-summary" className="mb-3 text-sm font-medium text-forest-700 dark:text-forest-400">
+          {searchSummary}
+        </p>
       )}
       <div className="space-y-2">
         <Row label="Provider">{scan.provider}</Row>
         <Row label="Recreation areas"><IdLinks values={scan.rec_area_ids} base={AREA_URL} names={recAreaNames} /></Row>
         <Row label="Campgrounds"><IdLinks values={scan.campground_ids} base={CAMPGROUND_URL} names={campgroundNames} /></Row>
         <Row label="Campsites"><IdLinks values={scan.campsite_ids} base={CAMPSITE_URL} names={campsiteNames} /></Row>
-        <Row label="Search windows">
+        <Row label="Search ranges">
           <span className="flex flex-wrap gap-1.5">
             {scan.search_windows.map((w, i) => (
               <span

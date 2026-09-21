@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describeSearch } from "./describeSearch";
+import { describeSearch, describeSearchShort } from "./describeSearch";
 
 const NEXT_WEEKEND = [{ start_date: "2026-09-25", end_date: "2026-09-27" }];
 const ALL_OCTOBER = [{ start_date: "2026-10-01", end_date: "2026-11-01" }];
@@ -57,5 +57,39 @@ describe("describeSearch", () => {
     const text = describeSearch(crossing, 1, false, [])!;
     expect(text).toMatch(/2026/);
     expect(text).toMatch(/2027/);
+  });
+
+  it("reads naturally for a single weekend night rather than '1 night on Fri/Sat nights'", () => {
+    expect(describeSearch(ALL_OCTOBER, 1, true, [])).toBe(
+      "Any Fri or Sat night between Oct 1 and Oct 31, 2026",
+    );
+  });
+});
+
+describe("describeSearchShort", () => {
+  it("says nothing without a complete window", () => {
+    expect(describeSearchShort([], 1, false)).toBeNull();
+  });
+
+  it("ends an exact-length stay on its check-out day", () => {
+    expect(describeSearchShort(NEXT_WEEKEND, 2, false)).toMatch(/^Sep 25 . Sep 27 · 2 nights$/);
+  });
+
+  it("ends a wider range on the last bookable night, not the exclusive bound", () => {
+    const text = describeSearchShort(ALL_OCTOBER, 1, false)!;
+    expect(text).toMatch(/Oct 1 . Oct 31 · 1 night$/);
+    expect(text).not.toMatch(/Nov/);
+  });
+
+  it("flags weekends-only compactly", () => {
+    expect(describeSearchShort(ALL_OCTOBER, 2, true)).toMatch(/· 2 nights · weekends$/);
+  });
+
+  it("counts extra ranges instead of listing them", () => {
+    const two = [
+      { start_date: "2026-09-25", end_date: "2026-09-27" },
+      { start_date: "2026-10-02", end_date: "2026-10-04" },
+    ];
+    expect(describeSearchShort(two, 2, false)).toMatch(/\+1 more$/);
   });
 });

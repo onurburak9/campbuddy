@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import type { ScanFormState, Setter } from "./useScanFormState";
 import type { SearchWindow } from "../../types";
 import {
+  anyWeekendNightInMonth,
   nextTwoWeekends,
   nextWeekend,
   upcomingMonths,
@@ -62,6 +63,10 @@ function DateTemplateRow({ set }: { set: Setter }) {
         <Button type="button" variant="secondary" size="sm"
           onClick={() => apply(weekendsInMonth(monthKey, new Date()))}>
           Weekends in {month.name}
+        </Button>
+        <Button type="button" variant="secondary" size="sm"
+          onClick={() => apply(anyWeekendNightInMonth(monthKey, new Date()))}>
+          Any Fri/Sat night in {month.name}
         </Button>
       </div>
     </div>

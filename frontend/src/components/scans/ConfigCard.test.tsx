@@ -131,4 +131,20 @@ describe("ConfigCard", () => {
     expect(activeChip).not.toHaveClass("line-through");
     expect(screen.getByText("expired")).toBeInTheDocument();
   });
+
+  it("interprets the window, nights and weekend filter instead of only listing them raw", () => {
+    const monthScan: Scan = {
+      ...scan,
+      search_windows: [{ start_date: "2026-10-01", end_date: "2026-11-01", expired: false }],
+      nights: 2,
+      days_of_week: null,
+      weekends_only: true,
+    };
+    wrap(<ConfigCard scan={monthScan} />);
+
+    const summary = screen.getByTestId("config-search-summary");
+    expect(summary).toHaveTextContent("Any 2 nights over a Fri–Sun weekend, between Oct 1 and Oct 31, 2026");
+    // Nov 1 is only the exclusive range bound, never a date the user searches.
+    expect(summary).not.toHaveTextContent("Nov");
+  });
 });
