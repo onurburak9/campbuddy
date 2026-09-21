@@ -84,6 +84,8 @@ main.py         — scheduler entry point
 | `SMTP_FROM` | yes | From address shown in emails |
 | `TELEGRAM_BOT_TOKEN` | no | Bot token from @BotFather; leave empty to disable |
 | `PLAYWRIGHT_SERVICE_URL` | no | Internal URL of Playwright sidecar (default: http://playwright:8001) |
+| `CART_ADD_MAX_SITES` | no | Max sites one scan run may add to cart (default: 5). Each add is a real 15-min hold |
+| `PLAYWRIGHT_HEADLESS` | no | Set `true` to run the sidecar browser headless. Default `false` — Recreation.gov silently rejects headless logins |
 | `DATABASE_URL` | no | SQLite path (default: sqlite:///./data/campbuddy.db) |
 | `API_SECRET_KEY` | yes (api) | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `COOKIE_SECURE` | no | Set `true` when serving the API over HTTPS (default: false) |

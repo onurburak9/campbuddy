@@ -35,6 +35,16 @@ def test_add_all_continues_after_exception(mocker):
     assert results[1]["success"] is True
 
 
+def test_service_shutdown_releases_the_browser(mocker):
+    """Without this the container cannot be stopped by Docker."""
+    from fastapi.testclient import TestClient
+    import playwright_service.main as main
+    shutdown = mocker.patch.object(main, "shutdown_browser")
+    with TestClient(main.app):
+        pass
+    shutdown.assert_called_once()
+
+
 def test_batch_endpoint(mocker):
     from fastapi.testclient import TestClient
     import playwright_service.main as main

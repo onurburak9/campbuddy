@@ -1,7 +1,12 @@
 import httpx
 import pytest
 from unittest.mock import MagicMock
-from core.booking import attempt_cart_add, attempt_cart_add_batch, sidecar_healthy
+from core.booking import (
+    attempt_cart_add,
+    attempt_cart_add_batch,
+    batch_timeout_seconds,
+    sidecar_healthy,
+)
 
 
 def make_settings(url="http://playwright:8001"):
@@ -86,6 +91,37 @@ def test_batch_all_false_on_result_count_mismatch(respx_mock):
     )
     out = attempt_cart_add_batch(SITES, "u@e.com", "pw", make_settings())
     assert all(r["success"] is False for r in out) and len(out) == 2
+
+
+def test_batch_timeout_grows_with_site_count():
+    """A fixed 120s budget expired mid-batch and reported every site as failed."""
+    assert batch_timeout_seconds(10) > batch_timeout_seconds(1)
+
+
+def test_batch_timeout_covers_a_realistic_per_site_cost():
+    # Measured against the live site: ~10s login, ~8s per site. Ten sites must
+    # not be given less than the ~80s of real work they require.
+    assert batch_timeout_seconds(10) >= 10 * 20
+
+
+def test_batch_timeout_is_positive_for_an_empty_batch():
+    assert batch_timeout_seconds(0) > 0
+
+
+def test_batch_uses_a_site_count_derived_timeout(mocker):
+    post = mocker.patch("core.booking.httpx.post",
+                        return_value=httpx.Response(200, json={"results": [
+                            {"success": True, "error": None}, {"success": True, "error": None}]}))
+    attempt_cart_add_batch(SITES, "u@e.com", "pw", make_settings())
+    assert post.call_args.kwargs["timeout"] == batch_timeout_seconds(len(SITES))
+
+
+def test_batch_honours_an_explicit_timeout_override(mocker):
+    post = mocker.patch("core.booking.httpx.post",
+                        return_value=httpx.Response(200, json={"results": [
+                            {"success": True, "error": None}, {"success": True, "error": None}]}))
+    attempt_cart_add_batch(SITES, "u@e.com", "pw", make_settings(), timeout=12.5)
+    assert post.call_args.kwargs["timeout"] == 12.5
 
 
 def test_sidecar_healthy_true(respx_mock):

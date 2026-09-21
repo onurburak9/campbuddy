@@ -25,10 +25,12 @@ Navigating to `https://www.recreation.gov/log-in` redirects to `https://www.recr
 | Element | Selector |
 |---------|----------|
 | Email input | `input#email` |
-| Password input | `input#rec-acct-sign-in-password` |
-| Submit button | `button.rec-acct-sign-in-btn` |
+| Password input | `input#password` |
+| Submit button | `get_by_role("button", name="Log In", exact=True)` |
 
-There are two buttons matching `"Log In"` text on the page (nav + modal). Always target by class, not text.
+The nav's sign-in control is labelled `"Sign Up / Log In"`, so an **exact** accessible-name
+match on `"Log In"` resolves the modal's submit button uniquely. The old
+`rec-acct-*` ids and classes were removed in the "sarsa" design-system rewrite.
 
 ### Success indicator
 
@@ -148,9 +150,15 @@ Recreation.gov applies multiple layers of bot detection. As of May 2026, headles
 
 ### Current mitigations (see `playwright_service/browser.py`)
 
-1. **`playwright-stealth`** — patches ~20 headless fingerprint vectors automatically on every page load
-2. **Manual `STEALTH_JS`** init script — belt-and-suspenders for `webdriver`, `plugins`, `languages`, `hardwareConcurrency`, `deviceMemory`, `chrome` runtime, and `permissions.query`
-3. **Chrome 136 user agent** + matching `sec-ch-ua` / `sec-ch-ua-platform` headers
+1. **Headed Chromium on an Xvfb display** — the single biggest lever. Headless is
+   rejected silently: the sign-in form spins for ~30 s and **no auth request is
+   ever sent**. Verified on both Chromium 125 and 147.
+2. **Manual `STEALTH_JS`** init script — `webdriver`, `plugins`, `languages`,
+   `chrome` runtime, and `permissions.query`
+3. **No user-agent override.** Spoofing the UA string while `navigator.userAgentData`
+   still reported the real build produced an *"outdated browser… may prevent you
+   from making purchases"* interstitial. Let the real browser identify itself and
+   keep the image current instead.
 4. **Human-like typing** — per-character delays (30–100 ms) via `page.keyboard.type()`
 5. **Jitter delays** — random pauses between every major action (hover, click, navigation)
 6. **Hover before click** on the cart button
@@ -170,11 +178,12 @@ If a future Recreation.gov update re-enables the CAPTCHA despite the current mit
 | Purpose | Selector | Notes |
 |---------|----------|-------|
 | Email field | `input#email` | Inside login modal |
-| Password field | `input#rec-acct-sign-in-password` | Inside login modal |
-| Login submit | `button.rec-acct-sign-in-btn` | Target by class — two "Log In" buttons on page |
+| Password field | `input#password` | Inside login modal |
+| Login submit | `role=button[name="Log In"][exact]` | Nav control is "Sign Up / Log In", so exact match disambiguates |
 | Logged-in check | `button[aria-label^="User:"]` | Appears in navbar after login |
 | Calendar next month | `button[aria-label="Next"]` | class `next-prev-button` |
 | Calendar date | `role=button[name="{Weekday}, {Month} {Day}, {Year} - Available"]` | ARIA label on each cell |
 | Add to Cart | `#add-cart-campsite` | In sticky footer, visible only when dates selected |
 | Outdated browser banner | `button:has-text('Ignore')` | Dismiss it; non-fatal if absent |
-| Cart count (success) | `a[aria-label*="in cart"]` | e.g. "Cart - 1 item in cart." |
+| Cart link | `a#ga-global-nav-account-cart-link` | aria-label goes `"Cart"` → `"Cart - 1 item in cart."`; **cumulative — not a per-site success signal** |
+| Add-to-cart success | URL contains `/camping/reservations/orderdetails` | Clicking Add to Cart navigates here; the only per-site signal |

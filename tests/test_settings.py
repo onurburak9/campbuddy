@@ -33,6 +33,23 @@ def test_telegram_defaults_empty(env):
     assert s.telegram_bot_token == ""
 
 
+def test_cart_add_max_sites_defaults_to_a_small_batch(env):
+    s = Settings(_env_file=None)
+    assert s.cart_add_max_sites == 5
+
+
+def test_cart_add_max_sites_is_configurable(env):
+    env.setenv("CART_ADD_MAX_SITES", "2")
+    s = Settings(_env_file=None)
+    assert s.cart_add_max_sites == 2
+
+
+def test_cart_add_max_sites_rejects_zero(env):
+    env.setenv("CART_ADD_MAX_SITES", "0")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 def test_missing_required_field_raises(env):
     env.delenv("ENCRYPTION_KEY", raising=False)
     with pytest.raises(ValidationError):

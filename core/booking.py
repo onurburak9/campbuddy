@@ -3,6 +3,18 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# Measured against the live site: ~10s to log in (up to ~40s when Recreation.gov
+# stalls the sign-in form) and ~8s per site. The sidecar works through a batch
+# sequentially, so a fixed client-side budget silently expired part-way and
+# reported every site as failed. Scale the budget with the batch instead.
+LOGIN_OVERHEAD_SECONDS = 60.0
+PER_SITE_SECONDS = 30.0
+
+
+def batch_timeout_seconds(site_count: int) -> float:
+    """HTTP timeout to allow the sidecar for a batch of `site_count` sites."""
+    return LOGIN_OVERHEAD_SECONDS + PER_SITE_SECONDS * max(site_count, 1)
+
 
 def attempt_cart_add(booking_url: str, email: str, password: str, settings, check_in: str, check_out: str) -> bool:
     try:
@@ -27,7 +39,9 @@ def attempt_cart_add(booking_url: str, email: str, password: str, settings, chec
         return False
 
 
-def attempt_cart_add_batch(sites: list[dict], email: str, password: str, settings, timeout: float = 120.0) -> list[dict]:
+def attempt_cart_add_batch(sites: list[dict], email: str, password: str, settings, timeout: float | None = None) -> list[dict]:
+    if timeout is None:
+        timeout = batch_timeout_seconds(len(sites))
     try:
         resp = httpx.post(
             f"{settings.playwright_service_url}/add-to-cart-batch",
