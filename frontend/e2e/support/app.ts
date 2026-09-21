@@ -57,22 +57,9 @@ export async function mockApi(page: Page, onCreateScan?: (body: CreatedScanBody)
   });
 }
 
-/**
- * The floating Feedback button is `fixed bottom-4 right-4` and lands on top of
- * the wizard's primary action button, swallowing the click. That overlap is a
- * known issue being fixed separately; hide the button here so these specs fail
- * only on window-validation regressions. Delete once the overlap is resolved.
- */
-async function hideFeedbackOverlay(page: Page) {
-  const fab = page.getByRole("button", { name: "Feedback", exact: true });
-  await fab.waitFor();
-  await fab.evaluate((el) => { (el as HTMLElement).style.display = "none"; });
-}
-
 /** Loads the dashboard and opens the new-scan wizard on its first step. */
 export async function openWizard(page: Page) {
   await page.goto("/");
-  await hideFeedbackOverlay(page);
   // Targeted by data-tour rather than name: "New scan" also substring-matches
   // the empty-state's "+ New Scan" button once the scan list has loaded.
   await page.locator('[data-tour="new-scan-button"]').click();
