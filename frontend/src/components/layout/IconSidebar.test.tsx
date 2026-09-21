@@ -128,4 +128,10 @@ describe("IconSidebar", () => {
     render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
     expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
   });
+
+  it("includes a feedback trigger above the account avatar", async () => {
+    render(<MemoryRouter><IconSidebar onOpenScans={vi.fn()} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: /send feedback/i }));
+    expect(screen.getByRole("heading", { name: /send feedback/i })).toBeInTheDocument();
+  });
 });

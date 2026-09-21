@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/cn";
+import { FeedbackWidget } from "../feedback/FeedbackWidget";
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -130,44 +131,47 @@ export function IconSidebar({ onOpenScans, open = false, onClose }: {
             </Link>
           )}
         </div>
-        <div
-          ref={accountMenuRef}
-          className="relative flex flex-col items-center"
-          onMouseEnter={openAccountMenu}
-          onMouseLeave={scheduleCloseAccountMenu}
-        >
-          {accountMenuOpen && (
-            <div
-              role="menu"
-              className="absolute bottom-0 left-full z-50 ml-2 w-48 rounded-lg border border-sand-200 bg-white py-1 shadow-lg dark:border-[#222] dark:bg-[#1A1A1A]"
-            >
-              <button
-                role="menuitem"
-                onClick={toggle}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
-              >
-                <img src={theme === "dark" ? "/icons/sun.svg" : "/icons/moon.svg"} alt="" className="h-5 w-5" />
-                {theme === "dark" ? "Light mode" : "Dark mode"}
-              </button>
-              <button
-                role="menuitem"
-                onClick={() => { setAccountMenuOpen(false); logout().then(() => navigate("/login", { replace: true })); }}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
-              >
-                <img src="/icons/door.svg" alt="" className="h-5 w-5" />
-                Log out
-              </button>
-            </div>
-          )}
-          <button
-            aria-label={`Account menu for ${user?.email ?? ""}`}
-            aria-expanded={accountMenuOpen}
-            aria-haspopup="menu"
-            onClick={openAccountMenu}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-forest-600 text-base font-semibold text-white"
+        <div className="flex flex-col items-center gap-2">
+          <FeedbackWidget className="hidden h-10 w-10 md:flex" />
+          <div
+            ref={accountMenuRef}
+            className="relative flex flex-col items-center"
+            onMouseEnter={openAccountMenu}
+            onMouseLeave={scheduleCloseAccountMenu}
           >
-            {user?.email?.[0]?.toUpperCase() ?? "?"}
-          </button>
+            {accountMenuOpen && (
+              <div
+                role="menu"
+                className="absolute bottom-0 left-full z-50 ml-2 w-48 rounded-lg border border-sand-200 bg-white py-1 shadow-lg dark:border-[#222] dark:bg-[#1A1A1A]"
+              >
+                <button
+                  role="menuitem"
+                  onClick={toggle}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+                >
+                  <img src={theme === "dark" ? "/icons/sun.svg" : "/icons/moon.svg"} alt="" className="h-5 w-5" />
+                  {theme === "dark" ? "Light mode" : "Dark mode"}
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => { setAccountMenuOpen(false); logout().then(() => navigate("/login", { replace: true })); }}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-stone-700 hover:bg-sand-100 dark:text-[#CCC] dark:hover:bg-[#222]"
+                >
+                  <img src="/icons/door.svg" alt="" className="h-5 w-5" />
+                  Log out
+                </button>
+              </div>
+            )}
+            <button
+              aria-label={`Account menu for ${user?.email ?? ""}`}
+              aria-expanded={accountMenuOpen}
+              aria-haspopup="menu"
+              onClick={openAccountMenu}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-forest-600 text-base font-semibold text-white"
+            >
+              {user?.email?.[0]?.toUpperCase() ?? "?"}
+            </button>
+          </div>
         </div>
       </nav>
     </>
