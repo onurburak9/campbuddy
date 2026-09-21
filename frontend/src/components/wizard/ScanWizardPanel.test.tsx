@@ -12,10 +12,17 @@ vi.mock("../../contexts/AuthContext", () => ({ useAuth: () => ({ user: mockUser(
 vi.mock("../../lib/tour");
 
 import { ScanWizardPanel } from "./ScanWizardPanel";
-import { startWizardProviderTour, hasSeenWizardTour } from "../../lib/tour";
+import {
+  startWizardProviderTour,
+  hasSeenWizardTour,
+  startWizardDatesTour,
+  hasSeenWizardDatesTour,
+} from "../../lib/tour";
 
 const startWizardProviderTourMock = vi.mocked(startWizardProviderTour);
 const hasSeenWizardTourMock = vi.mocked(hasSeenWizardTour);
+const startWizardDatesTourMock = vi.mocked(startWizardDatesTour);
+const hasSeenWizardDatesTourMock = vi.mocked(hasSeenWizardDatesTour);
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -54,14 +61,14 @@ describe("ScanWizardPanel", () => {
     // Step 1 — add a Recreation Area by ID via the SearchSelect's fallback input
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 2 — add a window
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     // first two empty inputs are the date pickers
     await userEvent.type(dates[0], "2026-07-01");
     await userEvent.type(dates[1], "2026-07-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 3 — create
     await userEvent.click(screen.getByRole("button", { name: /create scan/i }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
@@ -73,12 +80,12 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     await userEvent.type(dates[0], "2026-07-01");
     await userEvent.type(dates[1], "2026-07-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/reached your scan limit/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create scan/i })).toBeDisabled();
@@ -89,7 +96,7 @@ describe("ScanWizardPanel", () => {
     expect(screen.getByText(/step 1 of 3 · provider & sites/i)).toBeInTheDocument();
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     expect(screen.getByText(/step 2 of 3 · dates & filters/i)).toBeInTheDocument();
   });
 
@@ -97,6 +104,9 @@ describe("ScanWizardPanel", () => {
     startWizardProviderTourMock.mockClear();
     hasSeenWizardTourMock.mockClear();
     hasSeenWizardTourMock.mockReturnValue(true);
+    startWizardDatesTourMock.mockClear();
+    hasSeenWizardDatesTourMock.mockClear();
+    hasSeenWizardDatesTourMock.mockReturnValue(true);
   });
 
   it("auto-starts the provider tour on mount when it hasn't been seen", () => {
@@ -110,14 +120,52 @@ describe("ScanWizardPanel", () => {
     expect(startWizardProviderTourMock).not.toHaveBeenCalled();
   });
 
-  it("replays the provider tour via the help icon, and hides the icon once past step 1", async () => {
+  it("replays the tour for whichever step the user is on", async () => {
     wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
     await userEvent.click(screen.getAllByRole("button", { name: /show tips for this step/i })[0]);
     expect(startWizardProviderTourMock).toHaveBeenCalledTimes(1);
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+
+    await userEvent.click(screen.getAllByRole("button", { name: /show tips for this step/i })[0]);
+    expect(startWizardDatesTourMock).toHaveBeenCalledTimes(1);
+    expect(startWizardProviderTourMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto-starts the dates tour the first time the user reaches the dates step", async () => {
+    hasSeenWizardDatesTourMock.mockReturnValue(false);
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    expect(startWizardDatesTourMock).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+
+    expect(startWizardDatesTourMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-start the dates tour once it has been seen", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+
+    expect(startWizardDatesTourMock).not.toHaveBeenCalled();
+  });
+
+  it("hides the help icon on the notifications step, which has no tour", async () => {
+    wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
+    await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
+    await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: /add window/i }));
+    const dates = screen.getAllByDisplayValue("");
+    await userEvent.type(dates[0], "2026-07-01");
+    await userEvent.type(dates[1], "2026-07-03");
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+
     expect(screen.queryByRole("button", { name: /show tips for this step/i })).not.toBeInTheDocument();
   });
 
@@ -126,8 +174,8 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/add at least one search window with start and end dates/i))
       .toBeInTheDocument();
@@ -139,12 +187,12 @@ describe("ScanWizardPanel", () => {
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
     const dates = screen.getAllByDisplayValue("");
     await userEvent.type(dates[0], "2026-04-01");
     await userEvent.type(dates[1], "2026-04-03");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/at least one search window must end today or later/i))
       .toBeInTheDocument();

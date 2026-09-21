@@ -12,7 +12,7 @@ test.describe("scan wizard — search window validation", () => {
   });
 
   test("blocks advancing when no search window has been added", async ({ page }) => {
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByText("Add at least one search window with start and end dates.")).toBeVisible();
     await expect(page.getByRole("button", { name: /add window/i })).toBeVisible();
@@ -22,7 +22,7 @@ test.describe("scan wizard — search window validation", () => {
   test("blocks advancing when a window is missing its end date", async ({ page }) => {
     await page.getByRole("button", { name: /add window/i }).click();
     await page.locator('input[type="date"]').first().fill(isoDaysFromToday(14));
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByText("Add at least one search window with start and end dates.")).toBeVisible();
     await expect(page.getByLabel("Polling interval")).toBeHidden();
@@ -31,19 +31,19 @@ test.describe("scan wizard — search window validation", () => {
   test("blocks advancing when every window has already ended", async ({ page }) => {
     await page.getByRole("button", { name: /add window/i }).click();
     await fillWindow(page, 0, isoDaysFromToday(-30), isoDaysFromToday(-28));
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByText("At least one search window must end today or later.")).toBeVisible();
     await expect(page.getByLabel("Polling interval")).toBeHidden();
   });
 
   test("advances once a future window is added, and clears the error", async ({ page }) => {
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
     await expect(page.getByText("Add at least one search window with start and end dates.")).toBeVisible();
 
     await page.getByRole("button", { name: /add window/i }).click();
     await fillWindow(page, 0, isoDaysFromToday(14), isoDaysFromToday(16));
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByLabel("Polling interval")).toBeVisible();
     await expect(page.getByText("Add at least one search window with start and end dates.")).toBeHidden();
@@ -54,7 +54,7 @@ test.describe("scan wizard — search window validation", () => {
     const end = isoDaysFromToday(16);
     await page.getByRole("button", { name: /add window/i }).click();
     await fillWindow(page, 0, start, end);
-    await page.getByRole("button", { name: /next/i }).click();
+    await page.getByRole("button", { name: "Next →" }).click();
 
     const [request] = await Promise.all([
       page.waitForRequest((r) => r.url().includes("/api/v1/scans") && r.method() === "POST"),

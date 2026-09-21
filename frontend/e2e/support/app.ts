@@ -27,11 +27,15 @@ export type CreatedScanBody = Record<string, unknown>;
  * ambiguity, and so an unstubbed call fails loudly instead of reaching the dead
  * dev-server proxy.
  */
-export async function mockApi(page: Page, onCreateScan?: (body: CreatedScanBody) => void) {
+export async function mockApi(
+  page: Page,
+  onCreateScan?: (body: CreatedScanBody) => void,
+) {
   await page.addInitScript(() => {
     // Suppress the driver.js onboarding tours; their overlay swallows clicks.
     localStorage.setItem("campbuddy:tour-seen:welcome", "1");
     localStorage.setItem("campbuddy:tour-seen:wizard", "1");
+    localStorage.setItem("campbuddy:tour-seen:wizard-dates", "1");
   });
 
   await page.route("**/api/v1/**", async (route: Route) => {
@@ -62,14 +66,16 @@ export async function openWizard(page: Page) {
   await page.goto("/");
   // Targeted by data-tour rather than name: "New scan" also substring-matches
   // the empty-state's "+ New Scan" button once the scan list has loaded.
-  await page.locator('[data-tour="new-scan-button"]').click();
+  const newScan = page.locator('[data-tour="new-scan-button"]');
+  await newScan.waitFor();
+  await newScan.click();
 }
 
 /** Completes step 1 (Provider & Sites) by adding a recreation area by ID. */
 export async function completeProviderStep(page: Page) {
   await page.getByLabel("Add by ID").first().fill(String(YOSEMITE.id));
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
-  await page.getByRole("button", { name: /next/i }).click();
+  await page.getByRole("button", { name: "Next →" }).click();
 }
 
 /** Fills the nth search-window row on the Dates & Filters step. */
@@ -77,4 +83,21 @@ export async function fillWindow(page: Page, index: number, start: string, end: 
   const rows = page.locator('input[type="date"]');
   await rows.nth(index * 2).fill(start);
   await rows.nth(index * 2 + 1).fill(end);
+}
+
+/** Current values of every date input on the step, in DOM order. */
+export async function dateValues(page: Page): Promise<string[]> {
+  return page.locator('input[type="date"]').evaluateAll((els) =>
+    els.map((el) => (el as HTMLInputElement).value),
+  );
+}
+
+/** Weekday of a YYYY-MM-DD string, read at local noon to dodge UTC parsing. */
+export function weekdayOf(iso: string): number {
+  return new Date(`${iso}T12:00:00`).getDay();
+}
+
+export function nightsBetween(start: string, end: string): number {
+  const ms = new Date(`${end}T12:00:00`).getTime() - new Date(`${start}T12:00:00`).getTime();
+  return Math.round(ms / 86_400_000);
 }

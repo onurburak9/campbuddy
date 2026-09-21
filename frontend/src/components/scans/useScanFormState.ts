@@ -22,6 +22,8 @@ export interface ScanFormState {
   notifyNewOnly: boolean;
 }
 
+export type Setter = <K extends keyof ScanFormState>(key: K, value: ScanFormState[K]) => void;
+
 function idsAsFallbackItems(ids: number[] | null | undefined): SelectedItem[] {
   return (ids ?? []).map((id) => ({ id, name: `ID ${id}` }));
 }
