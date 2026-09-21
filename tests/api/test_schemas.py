@@ -29,6 +29,32 @@ def test_scan_result_response_includes_availability_fields():
     assert resp.is_available is True
 
 
+def test_scan_result_response_exposes_the_cart_failure_reason():
+    now = datetime.now(timezone.utc)
+    result = ScanResult(
+        id=1, scan_run_id=1, scan_id=1, campsite_id="1", facility_name="F",
+        site_name="S", campsite_type="T", booking_date=date(2026, 7, 3),
+        booking_end_date=date(2026, 7, 6), booking_url="https://example.com",
+        first_seen_at=now, last_seen_at=now, is_available=True,
+        cart_added=False, notified=False,
+        cart_error="Add to Cart is disabled for these dates",
+    )
+    resp = ScanResultResponse.from_orm(result)
+    assert resp.cart_error == "Add to Cart is disabled for these dates"
+
+
+def test_scan_result_cart_error_defaults_to_none():
+    now = datetime.now(timezone.utc)
+    result = ScanResult(
+        id=1, scan_run_id=1, scan_id=1, campsite_id="1", facility_name="F",
+        site_name="S", campsite_type="T", booking_date=date(2026, 7, 3),
+        booking_end_date=date(2026, 7, 6), booking_url="https://example.com",
+        first_seen_at=now, last_seen_at=now, is_available=True,
+        cart_added=True, notified=False,
+    )
+    assert ScanResultResponse.from_orm(result).cart_error is None
+
+
 def test_scan_response_flags_expired_and_active_windows():
     past = {
         "start_date": (date.today() - timedelta(days=10)).isoformat(),

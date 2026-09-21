@@ -36,6 +36,7 @@ class CartRequest(BaseModel):
 class CartResponse(BaseModel):
     success: bool
     error: str | None = None
+    duration_ms: int | None = None
 
 
 class BatchSite(BaseModel):
@@ -53,6 +54,7 @@ class BatchRequest(BaseModel):
 class BatchResult(BaseModel):
     success: bool
     error: str | None = None
+    duration_ms: int | None = None
 
 
 class BatchResponse(BaseModel):

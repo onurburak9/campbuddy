@@ -8,6 +8,15 @@ from db.session import get_db
 from core.availability import active_windows, check_availability
 from core.booking import attempt_cart_add_batch, sidecar_healthy
 from core.crypto import decrypt_password
+from core.events import (
+    REASON_OVER_CAP,
+    REASON_SIDECAR_UNAVAILABLE,
+    RESULT_FAILURE,
+    RESULT_SKIPPED,
+    RESULT_SUCCESS,
+    cart_add_event,
+    classify_cart_error,
+)
 from core.notifier import (
     notify_available,
     notify_cart_results,
@@ -161,6 +170,10 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
     try:
         if not sidecar_healthy(settings):
             logger.warning("Sidecar unhealthy; skipping cart-add for scan %d", scan_id)
+            logger.info(cart_add_event(
+                result=RESULT_SKIPPED, scan_id=scan_id,
+                reason=REASON_SIDECAR_UNAVAILABLE, found=len(new_items),
+            ))
             notify_cart_results(scan, payloads, settings, sidecar_available=False)
             return
 
@@ -170,23 +183,33 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
         # free up dozens of sites at once, so only the first few are carted.
         cart_items = new_items[: settings.cart_add_max_sites]
         if len(new_items) > len(cart_items):
-            logger.info(
-                "Scan %d: carting %d of %d new sites (cart_add_max_sites=%d)",
-                scan_id, len(cart_items), len(new_items), settings.cart_add_max_sites,
-            )
+            logger.info(cart_add_event(
+                result=RESULT_SKIPPED, scan_id=scan_id, reason=REASON_OVER_CAP,
+                capped=len(cart_items), found=len(new_items),
+            ))
         sites_payload = [s for _, _, s in cart_items]
         results = attempt_cart_add_batch(sites_payload, user.recreationgov_email, pw, settings)
 
         now = _now()
         with get_db(session_factory) as db:
-            for (rid, payload, _), res in zip(cart_items, results):
+            for (rid, payload, site), res in zip(cart_items, results):
                 carted = bool(res.get("success"))
+                error = None if carted else (res.get("error") or "")
                 payload.cart_added = carted
                 row = db.query(ScanResult).filter(ScanResult.id == rid).first()
                 if row:
                     row.cart_added = carted
+                    row.cart_error = error
                     if carted:
                         row.cart_added_at = now
+                logger.info(cart_add_event(
+                    result=RESULT_SUCCESS if carted else RESULT_FAILURE,
+                    scan_id=scan_id,
+                    campsite_id=row.campsite_id if row else None,
+                    reason=None if carted else classify_cart_error(error),
+                    duration_ms=res.get("duration_ms"),
+                    error=error,
+                ))
         notify_cart_results(scan, payloads, settings)
     except Exception as e:
         logger.error("Cart-add/notify phase failed for scan %d: %s", scan_id, e)

@@ -363,6 +363,83 @@ def test_every_found_site_is_still_notified_when_cart_add_is_capped(factory, sca
     assert len(cart_results.call_args.args[1]) == 12
 
 
+def _autobook_run(factory, scan_id, settings, mocker, sites, results, healthy=True):
+    _enable_autobook(factory, scan_id)
+    mocker.patch("core.runner.check_availability", return_value=sites)
+    mocker.patch("core.runner.sidecar_healthy", return_value=healthy)
+    mocker.patch("core.runner.decrypt_password", return_value="plaintext")
+    mocker.patch("core.runner.notify_available")
+    mocker.patch("core.runner.notify_cart_results")
+    mocker.patch("core.runner.attempt_cart_add_batch", return_value=results)
+    run_scan(scan_id, factory, settings)
+
+
+DISABLED = {"success": False, "error": "Add to Cart is disabled for these dates"}
+
+
+def test_cart_failure_reason_is_persisted(factory, scan_id, settings, mocker):
+    """cart_added=False alone can't distinguish failure from never-attempted."""
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()], [DISABLED])
+    with factory() as db:
+        row = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
+        assert row.cart_added is False
+        assert "disabled" in row.cart_error
+
+
+def test_cart_success_records_no_error(factory, scan_id, settings, mocker):
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()],
+                  [{"success": True, "error": None}])
+    with factory() as db:
+        row = db.query(ScanResult).filter(ScanResult.scan_id == scan_id).first()
+        assert row.cart_added is True
+        assert row.cart_error is None
+
+
+def test_cart_success_emits_a_structured_event(factory, scan_id, settings, mocker, caplog):
+    caplog.set_level("INFO", logger="core.runner")
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()],
+                  [{"success": True, "error": None, "duration_ms": 18004}])
+    line = next(r.message for r in caplog.records if "event=cart_add" in r.message)
+    assert "result=success" in line
+    assert "duration_ms=18004" in line
+
+
+def test_cart_failure_event_carries_a_reason_code(factory, scan_id, settings, mocker, caplog):
+    caplog.set_level("INFO", logger="core.runner")
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()], [DISABLED])
+    line = next(r.message for r in caplog.records if "event=cart_add" in r.message)
+    assert "result=failure" in line
+    assert "reason=button_disabled" in line
+
+
+def test_cart_event_is_a_single_line(factory, scan_id, settings, mocker, caplog):
+    """A multi-line Playwright error would split into several Loki entries."""
+    caplog.set_level("INFO", logger="core.runner")
+    multiline = {"success": False, "error": "Timeout 45000ms exceeded.\nwaiting for locator"}
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()], [multiline])
+    line = next(r.message for r in caplog.records if "event=cart_add" in r.message)
+    assert "\n" not in line
+
+
+def test_sites_over_the_cap_are_logged_as_skipped(factory, scan_id, settings, mocker, caplog):
+    caplog.set_level("INFO", logger="core.runner")
+    settings.cart_add_max_sites = 2
+    _autobook_run(factory, scan_id, settings, mocker, _many_sites(7),
+                  [{"success": True, "error": None}] * 2)
+    line = next(r.message for r in caplog.records
+                if "event=cart_add" in r.message and "result=skipped" in r.message)
+    assert "reason=over_cap" in line
+    assert "found=7" in line
+
+
+def test_unhealthy_sidecar_is_logged_as_skipped(factory, scan_id, settings, mocker, caplog):
+    caplog.set_level("INFO", logger="core.runner")
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()], [], healthy=False)
+    line = next(r.message for r in caplog.records
+                if "event=cart_add" in r.message and "result=skipped" in r.message)
+    assert "reason=sidecar_unavailable" in line
+
+
 def test_notified_only_set_on_available_success(factory, scan_id, settings, mocker):
     mocker.patch("core.runner.check_availability", return_value=[make_site()])
     mocker.patch("core.runner.notify_available", side_effect=RuntimeError("smtp down"))

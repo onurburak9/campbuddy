@@ -113,7 +113,12 @@ def _login(page, email: str, password: str) -> None:
     logger.info("Login successful")
 
 
+def _elapsed_ms(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
+
+
 def _add_single(page, booking_url: str, check_in: str, check_out: str) -> dict:
+    started = time.monotonic()
     check_in_date = datetime.strptime(check_in.strip(), "%m-%d-%Y").date()
     check_out_date = datetime.strptime(check_out.strip(), "%m-%d-%Y").date()
     _set_search_session(page, check_in_date, check_out_date)
@@ -132,7 +137,11 @@ def _add_single(page, booking_url: str, check_in: str, check_out: str) -> dict:
     if add_button.is_disabled():
         # Already held in this account's cart, or no longer bookable for these
         # dates. Report it rather than burning 30s on an unclickable element.
-        return {"success": False, "error": "Add to Cart is disabled for these dates"}
+        return {
+            "success": False,
+            "error": "Add to Cart is disabled for these dates",
+            "duration_ms": _elapsed_ms(started),
+        }
 
     page.hover(CART_SELECTOR)
     _jitter(400, 800)
@@ -145,19 +154,23 @@ def _add_single(page, booking_url: str, check_in: str, check_out: str) -> dict:
         return {
             "success": False,
             "error": f"No order-details redirect after Add to Cart — still at {page.url}",
+            "duration_ms": _elapsed_ms(started),
         }
     logger.info("Added to cart: %s", booking_url)
-    return {"success": True, "error": None}
+    return {"success": True, "error": None, "duration_ms": _elapsed_ms(started)}
 
 
 def _add_all(page, sites: list[dict]) -> list[dict]:
     results = []
     for s in sites:
+        started = time.monotonic()
         try:
             results.append(_add_single(page, s["booking_url"], s["check_in"], s["check_out"]))
         except Exception as e:
             logger.error("Cart add failed for %s: %s", s.get("booking_url"), e)
-            results.append({"success": False, "error": str(e)})
+            results.append({
+                "success": False, "error": str(e), "duration_ms": _elapsed_ms(started),
+            })
     return results
 
 

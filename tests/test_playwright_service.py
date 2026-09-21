@@ -55,4 +55,4 @@ def test_batch_endpoint(mocker):
         "sites": [{"booking_url": "u1", "check_in": "07-11-2026", "check_out": "07-13-2026"}],
     })
     assert resp.status_code == 200
-    assert resp.json() == {"results": [{"success": True, "error": None}]}
+    assert resp.json() == {"results": [{"success": True, "error": None, "duration_ms": None}]}
