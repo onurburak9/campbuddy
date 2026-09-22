@@ -125,6 +125,37 @@ headed-browser sign-in intermittently. Occasional failures are normal; a
 sustained run of them means the login flow has broken again, which is what the
 alert above is for.
 
+### Investigating login_failed
+
+`reason=login_failed` means Recreation.gov rejected the sign-in, but not why.
+`playwright_service/login_diagnose.py` separates the causes — it stops at the
+login step and places no cart holds:
+
+```bash
+docker cp playwright_service/login_diagnose.py \
+    "$(docker compose ps -q playwright)":/tmp/login_diagnose.py
+docker compose exec -T playwright python /tmp/login_diagnose.py \
+    --email you@example.com --password 'your-password'
+```
+
+| Verdict | Meaning |
+|---------|---------|
+| `EDGE_BLOCK` | the page itself was challenged — edge/WAF, usually the source IP |
+| `STALE_SELECTORS` | the form markup changed again; run `selector_check` |
+| `AUTH_REJECTED` | an auth request was sent and refused — credentials or account state |
+| `SILENT_REJECTION` | form submitted, no auth request ever sent — reCAPTCHA bot scoring |
+| `SUCCESS` | sign-in works from this host |
+
+`SILENT_REJECTION` is the interesting one: the client gives up before calling
+the API, so nothing reaches Recreation.gov to reject. The dominant input is
+source-IP reputation — datacenter ranges score far worse than residential, so
+the same credentials and image can pass on a laptop and fail on a VPS. Compare
+`docker compose exec playwright curl -s https://api.ipify.org` between hosts
+before concluding it is the code.
+
+Use `--no-submit` to probe the page without a login attempt at all (safe to
+run repeatedly; no lockout risk).
+
 ### Alerting
 
 No Prometheus needed — point a Grafana alert rule at the Loki datasource:
