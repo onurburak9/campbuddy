@@ -75,7 +75,9 @@ event=cart_add result=skipped scan_id=12 reason=over_cap capped=5 found=69
 
 Reason codes: `button_disabled` (already held or unbookable), `no_redirect`
 (click didn't reach order details), `login_failed` (Recreation.gov rejected
-the sign-in), `sidecar_unavailable`, `sidecar_error`, `over_cap`, `unknown`.
+the sign-in), `no_credentials` (auto_book on but the account has no stored
+Recreation.gov login), `sidecar_unavailable`, `sidecar_error`, `over_cap`,
+`unknown`.
 Keep this set small — it is used as a Grafana label. The full message lives in
 the `error` field and in `scan_results.cart_error`.
 
@@ -102,6 +104,26 @@ quantile_over_time(0.95,
 # Everything that failed for one scan
 {container="campbuddy-app-1"} | logfmt | event="cart_add" | scan_id="12" | result="failure"
 ```
+
+### First run with auto_book
+
+When enabling auto_book on a scan, the first thing to confirm is that the
+cart path is being reached at all:
+
+```logql
+{container="campbuddy-app-1"} | logfmt | event="cart_add"
+```
+
+Nothing at all means the runner returned before the cart phase — almost always
+because the run found no *new* sites (dedup: a site already in `scan_results`
+is not re-carted). `result=skipped reason=no_credentials` means the scan is
+configured but the account has no Recreation.gov login stored; check with
+`docker compose exec app python cli.py list-users` and look for `recgov=yes`.
+
+Expect some `reason=login_failed`: Recreation.gov's reCAPTCHA rejects a
+headed-browser sign-in intermittently. Occasional failures are normal; a
+sustained run of them means the login flow has broken again, which is what the
+alert above is for.
 
 ### Alerting
 

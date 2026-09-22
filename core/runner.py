@@ -9,6 +9,7 @@ from core.availability import active_windows, check_availability
 from core.booking import attempt_cart_add_batch, sidecar_healthy
 from core.crypto import decrypt_password
 from core.events import (
+    REASON_NO_CREDENTIALS,
     REASON_OVER_CAP,
     REASON_SIDECAR_UNAVAILABLE,
     RESULT_FAILURE,
@@ -165,6 +166,13 @@ def run_scan(scan_id: int, session_factory, settings) -> None:
     if not scan.auto_book:
         return
     if not (user and user.recreationgov_email and user.recreationgov_password):
+        # auto_book is on but the account has no Recreation.gov login stored.
+        # Returning silently here is indistinguishable from "nothing was
+        # available", so surface it as a skip.
+        logger.info(cart_add_event(
+            result=RESULT_SKIPPED, scan_id=scan_id,
+            reason=REASON_NO_CREDENTIALS, found=len(new_items),
+        ))
         return
 
     try:
