@@ -12,11 +12,13 @@ evidence needed to tell the causes apart:
   - stale selectors         → the form fields aren't found at all
 
 Run it against the live site from the host you're debugging. No cart holds are
-placed — it stops at the login step.
+placed — it stops at the login step. Copy it to `/app`, not `/tmp`: a script's
+own directory is what lands on sys.path, so from /tmp the `playwright_service`
+package is not importable.
 
     docker cp playwright_service/login_diagnose.py \
-        "$(docker compose ps -q playwright)":/tmp/login_diagnose.py
-    docker compose exec -T playwright python /tmp/login_diagnose.py \
+        "$(docker compose ps -q playwright)":/app/login_diagnose.py
+    docker compose exec -T playwright python /app/login_diagnose.py \
         --email you@example.com --password 'your-password'
 
 Credentials are read from --email/--password or RECGOV_EMAIL/RECGOV_PASSWORD.
@@ -30,6 +32,7 @@ import time
 
 from playwright_service.browser import (
     EMAIL_SELECTOR,
+    PlaywrightTimeout,
     LOGGED_IN_SELECTOR,
     LOGIN_URL,
     PASSWORD_SELECTOR,
@@ -80,6 +83,11 @@ def classify(signals: dict) -> tuple[str, str]:
                 "side gave up before calling the API. This is reCAPTCHA scoring the "
                 "session as a bot. The usual driver is the source IP reputation "
                 "(datacenter ranges score badly) rather than anything in the page.")
+    if not signals.get("submitted") and signals.get("form_rendered"):
+        return ("PAGE_OK",
+                "The login page renders and every field resolves. No login was "
+                "attempted (--no-submit), so this says nothing about whether "
+                "sign-in succeeds — rerun with credentials for that.")
     return ("UNKNOWN", "No clear signal; inspect the dump below.")
 
 
@@ -106,6 +114,17 @@ def _probe(page, email, password, submit, settle):
 
     t0 = time.perf_counter()
     resp = page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60_000)
+    # /log-in is a SPA route: it redirects client-side and renders the sign-in
+    # modal only after hydration. Probing straight after domcontentloaded finds
+    # no fields and grecaptcha undefined — a false STALE_SELECTORS. Wait for the
+    # form exactly as _login does before judging anything.
+    try:
+        page.wait_for_selector(EMAIL_SELECTOR, timeout=30_000)
+        signals["form_rendered"] = True
+    except PlaywrightTimeout:
+        signals["form_rendered"] = False
+    page.wait_for_timeout(2_000)
+
     signals["http_status"] = resp.status if resp else None
     signals["final_url"] = page.url
     signals["title"] = page.title()
@@ -199,7 +218,7 @@ def main(argv=None) -> int:
 
     verdict, explanation = classify(signals)
     print("\n--- signals ---")
-    for k in ("http_status", "final_url", "title", "page_load_s", "blocked_page",
+    for k in ("http_status", "final_url", "title", "page_load_s", "form_rendered", "blocked_page",
               "missing_fields", "captcha_nodes", "grecaptcha", "webdriver",
               "outdated_banner", "ua", "ua_data", "fields_filled",
               "submit_button_count", "submitted", "button_states", "settle_s",
