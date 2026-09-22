@@ -130,7 +130,44 @@ def redact_body(text: str) -> str:
     return json.dumps(out)[:600]
 
 
-def _probe(page, email, password, submit, settle):
+MACOS_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36")
+
+
+def apply_macos_identity(page, major: int) -> None:
+    """Present as desktop Chrome on macOS, consistently.
+
+    Recreation.gov posts a client-side device fingerprint with the login. Ours
+    is computed on Linux in a container; a real Chrome on macOS from the same
+    IP is accepted. Overriding only navigator.userAgent is what produced the
+    "outdated browser" interstitial previously — the string disagreed with
+    navigator.userAgentData. CDP's setUserAgentOverride sets the UA string,
+    the client-hint headers and userAgentData together, so they agree.
+    """
+    client = page.context.new_cdp_session(page)
+    client.send("Emulation.setUserAgentOverride", {
+        "userAgent": MACOS_UA.format(major=major),
+        "platform": "MacIntel",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "userAgentMetadata": {
+            "brands": [
+                {"brand": "Not_A Brand", "version": "8"},
+                {"brand": "Chromium", "version": str(major)},
+                {"brand": "Google Chrome", "version": str(major)},
+            ],
+            "fullVersion": f"{major}.0.0.0",
+            "platform": "macOS",
+            "platformVersion": "14.6.0",
+            "architecture": "x86",
+            "model": "",
+            "mobile": False,
+        },
+    })
+
+
+def _probe(page, email, password, submit, settle, as_macos=0):
+    if as_macos:
+        apply_macos_identity(page, as_macos)
     signals = {"missing_fields": [], "auth_responses": [], "requests": []}
 
     def on_response(resp):
@@ -243,6 +280,8 @@ def main(argv=None) -> int:
     p.add_argument("--password", default=os.getenv("RECGOV_PASSWORD"))
     p.add_argument("--no-submit", action="store_true", help="probe the page only")
     p.add_argument("--settle", type=int, default=60, help="seconds to watch after submit")
+    p.add_argument("--as-macos", type=int, nargs="?", const=153, default=0,
+                   metavar="MAJOR", help="present as macOS Chrome (default 153)")
     args = p.parse_args(argv)
 
     submit = not args.no_submit
@@ -254,7 +293,7 @@ def main(argv=None) -> int:
     print("=== Recreation.gov login diagnosis ===", flush=True)
     try:
         signals = run_in_browser_thread(lambda: _probe_in_context(
-            args.email, args.password, submit, args.settle))
+            args.email, args.password, submit, args.settle, args.as_macos))
     finally:
         shutdown_browser()
 
@@ -274,10 +313,10 @@ def main(argv=None) -> int:
     return 0 if verdict == "SUCCESS" else 1
 
 
-def _probe_in_context(email, password, submit, settle):
+def _probe_in_context(email, password, submit, settle, as_macos=0):
     context = _new_context(get_shared_browser())
     try:
-        return _probe(context.new_page(), email, password, submit, settle)
+        return _probe(context.new_page(), email, password, submit, settle, as_macos)
     finally:
         context.close()
 
