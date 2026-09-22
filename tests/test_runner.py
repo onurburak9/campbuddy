@@ -432,6 +432,43 @@ def test_sites_over_the_cap_are_logged_as_skipped(factory, scan_id, settings, mo
     assert "found=7" in line
 
 
+def test_missing_recreationgov_credentials_are_logged_as_skipped(
+    factory, scan_id, settings, mocker, caplog
+):
+    """auto_book on without stored credentials used to return in silence, which
+    looks identical to 'nothing was available'."""
+    caplog.set_level("INFO", logger="core.runner")
+    with factory() as db:
+        db.query(User).update({"recreationgov_email": None, "recreationgov_password": None})
+        db.commit()
+    _autobook_run(factory, scan_id, settings, mocker, [make_site()], [])
+    line = next(r.message for r in caplog.records
+                if "event=cart_add" in r.message and "result=skipped" in r.message)
+    assert "reason=no_credentials" in line
+
+
+def test_no_cart_add_attempted_without_credentials(factory, scan_id, settings, mocker):
+    _enable_autobook(factory, scan_id)
+    with factory() as db:
+        db.query(User).update({"recreationgov_email": None, "recreationgov_password": None})
+        db.commit()
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.sidecar_healthy", return_value=True)
+    mocker.patch("core.runner.notify_available")
+    batch = mocker.patch("core.runner.attempt_cart_add_batch")
+    run_scan(scan_id, factory, settings)
+    batch.assert_not_called()
+
+
+def test_autobook_off_stays_quiet(factory, scan_id, settings, mocker, caplog):
+    """Not an anomaly — must not add noise to the cart_add stream."""
+    caplog.set_level("INFO", logger="core.runner")
+    mocker.patch("core.runner.check_availability", return_value=[make_site()])
+    mocker.patch("core.runner.notify_available")
+    run_scan(scan_id, factory, settings)  # fixture defaults auto_book False
+    assert not any("event=cart_add" in r.message for r in caplog.records)
+
+
 def test_unhealthy_sidecar_is_logged_as_skipped(factory, scan_id, settings, mocker, caplog):
     caplog.set_level("INFO", logger="core.runner")
     _autobook_run(factory, scan_id, settings, mocker, [make_site()], [], healthy=False)

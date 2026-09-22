@@ -243,6 +243,35 @@ def test_list_users_shows_password_status(runner, factory):
     assert "login-pw=NO" in bob_line
 
 
+def test_list_users_shows_recreationgov_credential_status(runner, factory):
+    """auto_book silently does nothing without these, so they must be visible."""
+    with factory() as db:
+        db.add(User(
+            email="carol@example.com",
+            recreationgov_email="carol@rec.gov",
+            recreationgov_password="encrypted",
+        ))
+        db.commit()
+    _seed_user(factory, email="dave@example.com")
+
+    result = runner.invoke(cli, ["list-users"])
+    assert result.exit_code == 0
+    carol = next(l for l in result.output.splitlines() if "carol@example.com" in l)
+    dave = next(l for l in result.output.splitlines() if "dave@example.com" in l)
+    assert "recgov=yes" in carol
+    assert "recgov=NO" in dave
+
+
+def test_list_users_needs_both_recreationgov_fields(runner, factory):
+    """An email without a stored password is not usable for cart-add."""
+    with factory() as db:
+        db.add(User(email="erin@example.com", recreationgov_email="erin@rec.gov"))
+        db.commit()
+    result = runner.invoke(cli, ["list-users"])
+    erin = next(l for l in result.output.splitlines() if "erin@example.com" in l)
+    assert "recgov=NO" in erin
+
+
 # --- seed ---
 
 def test_seed_autobook_without_creds_skips_scan(tmp_path, runner, factory):

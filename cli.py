@@ -124,13 +124,16 @@ def list_users():
         for u in users:
             has_pw = "yes" if u.hashed_password else "NO"
             tg = "yes" if u.telegram_chat_id else "no"
+            # Both are required before auto_book will attempt a cart-add.
+            recgov = "yes" if (u.recreationgov_email and u.recreationgov_password) else "NO"
             scans = (
                 db.query(Scan)
                 .filter(Scan.user_id == u.id, Scan.deleted_at.is_(None))
                 .count()
             )
             click.echo(
-                f"[{u.id:3}] {u.email:32} | login-pw={has_pw:3} | telegram={tg:3} | scans={scans} | limit={u.scan_limit}"
+                f"[{u.id:3}] {u.email:32} | login-pw={has_pw:3} | recgov={recgov:3} "
+                f"| telegram={tg:3} | scans={scans} | limit={u.scan_limit}"
             )
 
 
