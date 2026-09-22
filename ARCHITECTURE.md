@@ -81,7 +81,31 @@ Isolated FastAPI service in its own Docker container. `POST /health` reports rea
 
 Bot-detection hardening: the browser runs **headed** against an Xvfb display because Recreation.gov silently drops logins from headless Chromium — the form spins for ~30s and no auth request is ever sent. `playwright_service/entrypoint.sh` starts Xvfb once on `:99` and the image sets `DISPLAY=:99`, so the server *and* any `docker compose exec` share one display. A `STEALTH_JS` init script patches the usual fingerprint vectors, and typing/jitter delays mimic a human. The user agent is deliberately **not** overridden; spoofing it while `navigator.userAgentData` reported the real build triggered an "outdated browser" interstitial. Set `PLAYWRIGHT_HEADLESS=true` to force headless for local debugging.
 
-Browser lifecycle: **one long-lived browser, a fresh context per request.** Closing a headed Chromium in this container never returns — it leaves zombie processes and wedges the container badly enough that `docker kill` fails. `context.close()` is instant, so isolation between requests (and between users' credentials) comes from contexts. `get_shared_browser()` relaunches if the browser dies. Playwright's sync objects are thread-bound and FastAPI runs sync endpoints on a threadpool, so all browser work is funnelled through a single dedicated thread via `run_in_browser_thread()`.
+Browser lifecycle: **one long-lived browser, a fresh context per request.** Closing a headed Chromium in this container never returns — it leaves zombie processes and wedges the container badly enough that `docker kill` fails. `context.close()` is instant, so isolation between requests (and between users' credentials) comes from contexts. `get_shared_browser()` relaunches if the browser dies. Playwright's sync objects are thread-bound and FastAPI runs sync endpoints on a threadpool, so all browser work is funnelled through a single dedicated thread via `run_in_browser_thread()`. On shutdown a FastAPI lifespan hook calls `playwright.stop()`, which reaps every chrome process — see [Verifying a clean restart](#verifying-a-clean-restart).
+
+### Verifying a clean restart
+
+A headed Chromium that is not released on shutdown leaves zombie processes and makes the container unstoppable: `docker stop` reports *"tried to kill container, but did not receive an exit event"*, the container cannot even be `exec`'d into, and only a daemon/VM restart clears it. Because `docker compose up -d` must stop and replace the sidecar whenever its image changes, that failure mode would break the normal deploy.
+
+The lifespan hook prevents it. Measured with a live headed browser in the server process: `down` 1.0s, `up -d --force-recreate` 1.1s, `stop` 0.5s, with `Application shutdown complete` in the log.
+
+Re-run this after any change to the browser lifecycle, or on a new host. It needs no credentials and places no cart holds — the dummy login fails, but a headed browser is launched first, which is the part that matters:
+
+```bash
+docker compose -p cb-verify build playwright
+docker compose -p cb-verify up -d playwright
+until docker compose -p cb-verify exec -T playwright curl -sf http://localhost:8001/health; do sleep 2; done
+
+# ~50s: login fails, but the server now owns a live headed Chromium
+docker compose -p cb-verify exec -T playwright curl -s -m 120 -X POST \
+  http://localhost:8001/add-to-cart -H 'Content-Type: application/json' \
+  -d '{"booking_url":"https://www.recreation.gov/camping/campsites/42210","email":"nobody@example.invalid","password":"nope","check_in":"10-12-2026","check_out":"10-14-2026"}'
+
+docker compose -p cb-verify exec -T playwright ps -eo stat,comm | grep -c chrome  # expect > 0
+time docker compose -p cb-verify down                                             # expect ~1s
+```
+
+If `down` instead hangs for ~24s and reports "did not receive an exit event", the hook is not completing. Check the sidecar log: it should reach `Application shutdown complete`, not stop at `Waiting for application shutdown`. Recovery is a daemon restart (`colima restart -p <profile>`, or `systemctl restart docker` on Linux); the first mitigation to try is `--timeout-graceful-shutdown` on uvicorn so it stops waiting on the hook.
 
 Login is treated as unreliable by design: even headed, Recreation.gov's reCAPTCHA occasionally rejects a session, so cart-add failure is non-fatal and the user is always notified with the booking URL.
 
