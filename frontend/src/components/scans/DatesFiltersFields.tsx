@@ -3,6 +3,7 @@ import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import { Button } from "../ui/Button";
+import { WindowRangePicker } from "./WindowRangePicker";
 import type { ScanFormState, Setter } from "./useScanFormState";
 import type { EquipmentType, SearchWindow } from "../../types";
 import { EQUIPMENT_TYPE_OPTIONS } from "../../lib/equipmentTypes";
@@ -125,22 +126,15 @@ export function DatesFiltersFields({ state, set }: { state: ScanFormState; set: 
           {summary ?? "Pick a quick pick above, or add a window below, to see what you'll be searching."}
         </p>
         {state.windows.map((w, i) => (
-          <div key={i} className="flex items-end gap-2">
-            <Input type="date" value={w.start_date}
-              {...(i === 0 ? { label: "Search from" } : { "aria-label": `Search from (range ${i + 1})` })}
-              onChange={(e) => updateWindow(i, { start_date: e.target.value })} />
-            <Input type="date" value={w.end_date}
-              {...(i === 0
-                ? {
-                    label: "Search until",
-                    hint: "The day you'd check out. The last night searched is the day before this.",
-                  }
-                : { "aria-label": `Search until (range ${i + 1})` })}
-              onChange={(e) => updateWindow(i, { end_date: e.target.value })} />
-            <Button type="button" variant="ghost" size="sm" onClick={() => removeWindow(i)}>
-              Remove
-            </Button>
-          </div>
+          <WindowRangePicker
+            key={i}
+            window={w}
+            index={i}
+            isFirst={i === 0}
+            nights={windowNights(w)}
+            onChange={(patch) => updateWindow(i, patch)}
+            onRemove={() => removeWindow(i)}
+          />
         ))}
         <Button type="button" variant="secondary" size="sm" onClick={addWindow}>
           + Add window

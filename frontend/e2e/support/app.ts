@@ -78,17 +78,41 @@ export async function completeProviderStep(page: Page) {
   await page.getByRole("button", { name: "Next →" }).click();
 }
 
-/** Fills the nth search-window row on the Dates & Filters step. */
-export async function fillWindow(page: Page, index: number, start: string, end: string) {
-  const rows = page.locator('input[type="date"]');
-  await rows.nth(index * 2).fill(start);
-  await rows.nth(index * 2 + 1).fill(end);
+/** Opens the nth search-window row's range-picker popover. */
+export async function openWindowPicker(page: Page, index: number) {
+  const name = index === 0 ? "Search dates" : `Search dates (range ${index + 1})`;
+  await page.getByRole("button", { name }).click();
 }
 
-/** Current values of every date input on the step, in DOM order. */
+/**
+ * Clicks a day (by ISO date) in the currently-open range-picker popover,
+ * paging forward with "Next month" until the target day is rendered.
+ */
+export async function pickDay(page: Page, iso: string) {
+  const cell = page.locator(`[data-day-iso="${iso}"]`);
+  for (let i = 0; i < 24 && !(await cell.isVisible()); i++) {
+    await page.getByRole("button", { name: "Next month" }).click();
+  }
+  await cell.click();
+}
+
+/** Closes the currently-open range-picker popover. */
+export async function closeWindowPicker(page: Page) {
+  await page.getByRole("button", { name: "Done" }).click();
+}
+
+/** Fills the nth search-window row via its range-picker calendar. */
+export async function fillWindow(page: Page, index: number, start: string, end: string) {
+  await openWindowPicker(page, index);
+  await pickDay(page, start);
+  await pickDay(page, end);
+  await closeWindowPicker(page);
+}
+
+/** Current start/end values of every window's trigger, in DOM order. */
 export async function dateValues(page: Page): Promise<string[]> {
-  return page.locator('input[type="date"]').evaluateAll((els) =>
-    els.map((el) => (el as HTMLInputElement).value),
+  return page.locator("[data-start-date]").evaluateAll((els) =>
+    els.flatMap((el) => [el.getAttribute("data-start-date") ?? "", el.getAttribute("data-end-date") ?? ""]),
   );
 }
 

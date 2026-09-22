@@ -5,7 +5,9 @@ import {
   isoDaysFromToday,
   mockApi,
   nightsBetween,
+  openWindowPicker,
   openWizard,
+  pickDay,
   weekdayOf,
 } from "./support/app";
 
@@ -117,10 +119,11 @@ test.describe("scan wizard — quick-pick date templates", () => {
   test("a generated window stays editable and removable", async ({ page }) => {
     await page.getByRole("button", { name: "Next weekend" }).click();
     const edited = isoDaysFromToday(40);
-    await page.locator('input[type="date"]').first().fill(edited);
+    await openWindowPicker(page, 0);
+    await pickDay(page, edited);
     expect((await dateValues(page))[0]).toBe(edited);
 
-    await page.getByRole("button", { name: "Remove" }).click();
+    await page.getByRole("button", { name: "Remove window" }).click();
     expect(await dateValues(page)).toEqual([]);
   });
 

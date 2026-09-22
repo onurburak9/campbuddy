@@ -1,5 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { completeProviderStep, fillWindow, isoDaysFromToday, mockApi, openWizard } from "./support/app";
+import {
+  closeWindowPicker,
+  completeProviderStep,
+  fillWindow,
+  isoDaysFromToday,
+  mockApi,
+  openWindowPicker,
+  openWizard,
+  pickDay,
+} from "./support/app";
 
 // Issue #51 — the wizard must not reach the Notifications step without at least
 // one fully-specified window that has not already ended.
@@ -21,7 +30,9 @@ test.describe("scan wizard — search window validation", () => {
 
   test("blocks advancing when a window is missing its end date", async ({ page }) => {
     await page.getByRole("button", { name: /add window/i }).click();
-    await page.locator('input[type="date"]').first().fill(isoDaysFromToday(14));
+    await openWindowPicker(page, 0);
+    await pickDay(page, isoDaysFromToday(14));
+    await closeWindowPicker(page);
     await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByText("Add at least one search window with start and end dates.")).toBeVisible();
@@ -29,8 +40,17 @@ test.describe("scan wizard — search window validation", () => {
   });
 
   test("blocks advancing when every window has already ended", async ({ page }) => {
+    // The range picker can't select a past date directly, so this simulates
+    // the realistic path instead: pick a valid near-future window, then let
+    // time pass (the user leaves the wizard open) until it's ended.
     await page.getByRole("button", { name: /add window/i }).click();
-    await fillWindow(page, 0, isoDaysFromToday(-30), isoDaysFromToday(-28));
+    await fillWindow(page, 0, isoDaysFromToday(2), isoDaysFromToday(4));
+
+    await page.clock.install();
+    await page.clock.fastForward(6 * 24 * 60 * 60 * 1000); // +6 days, past the window's end
+    // The blocking check is computed at render time, so force a re-render
+    // after the clock jump rather than relying on one happening on its own.
+    await page.getByRole("switch", { name: "Weekends only" }).click();
     await page.getByRole("button", { name: "Next →" }).click();
 
     await expect(page.getByText("At least one search window must end today or later.")).toBeVisible();

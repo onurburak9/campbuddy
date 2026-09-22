@@ -88,8 +88,13 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  // Each window's trigger button carries its current start/end as data
+  // attributes (see WindowRangePicker) since there's no plain <input> to read.
   const dateValues = (container: HTMLElement) =>
-    Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]')).map((i) => i.value);
+    Array.from(container.querySelectorAll<HTMLButtonElement>("[data-start-date]")).flatMap((b) => [
+      b.dataset.startDate ?? "",
+      b.dataset.endDate ?? "",
+    ]);
 
   it("fills one Friday-to-Sunday window from 'Next weekend', skipping the weekend in progress", async () => {
     const user = userEvent.setup();
@@ -166,11 +171,11 @@ describe("DatesFiltersFields — quick-pick date templates", () => {
     const { container } = render(<ControlledDatesFilters initial={{}} />);
 
     await user.click(screen.getByRole("button", { name: "Next weekend" }));
-    const [start] = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    await user.clear(start);
-    await user.type(start, "2026-09-24");
+    await user.click(screen.getByRole("button", { name: "Search dates" }));
+    await user.click(screen.getByRole("button", { name: /^September 24, 2026$/ }));
+    await user.click(screen.getByRole("button", { name: /^September 30, 2026$/ }));
 
-    expect(dateValues(container)).toEqual(["2026-09-24", "2026-09-27"]);
+    expect(dateValues(container)).toEqual(["2026-09-24", "2026-09-30"]);
   });
 });
 
@@ -226,8 +231,9 @@ describe("DatesFiltersFields — search summary and window labels", () => {
 
     await user.click(screen.getByRole("button", { name: "Next weekend" }));
 
-    expect(screen.getByLabelText("Search from")).toHaveValue("2026-09-25");
-    expect(screen.getByLabelText(/search until/i)).toHaveValue("2026-09-27");
+    const trigger = screen.getByRole("button", { name: "Search dates" });
+    expect(trigger).toHaveTextContent("Sep 25");
+    expect(trigger).toHaveTextContent("Sep 27");
   });
 });
 
@@ -273,9 +279,9 @@ describe("DatesFiltersFields — guidance", () => {
     expect(screen.getByTitle(/exactly/i)).toBeInTheDocument();
   });
 
-  it("explains that Search until is the check-out day, not the last night", () => {
+  it("explains that the end day is checkout, not the last night", () => {
     render(<ControlledDatesFilters initial={{ windows: [{ start_date: "", end_date: "" }] }} />);
-    expect(screen.getByTitle(/check out|last night/i)).toBeInTheDocument();
+    expect(screen.getByText(/checkout|last night/i)).toBeInTheDocument();
   });
 });
 
