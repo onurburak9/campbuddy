@@ -64,10 +64,9 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 2 — add a window
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
-    const dates = screen.getAllByDisplayValue("");
-    // first two empty inputs are the date pickers
-    await userEvent.type(dates[0], "2026-07-01");
-    await userEvent.type(dates[1], "2026-07-03");
+    await userEvent.click(screen.getByRole("button", { name: "Search dates" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 1, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 3, 2026" }));
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     // Step 3 — create
     await userEvent.click(screen.getByRole("button", { name: /create scan/i }));
@@ -82,9 +81,9 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
-    const dates = screen.getAllByDisplayValue("");
-    await userEvent.type(dates[0], "2026-07-01");
-    await userEvent.type(dates[1], "2026-07-03");
+    await userEvent.click(screen.getByRole("button", { name: "Search dates" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 1, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 3, 2026" }));
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/reached your scan limit/i)).toBeInTheDocument();
@@ -161,9 +160,9 @@ describe("ScanWizardPanel", () => {
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
-    const dates = screen.getAllByDisplayValue("");
-    await userEvent.type(dates[0], "2026-07-01");
-    await userEvent.type(dates[1], "2026-07-03");
+    await userEvent.click(screen.getByRole("button", { name: "Search dates" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 1, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "July 3, 2026" }));
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.queryByRole("button", { name: /show tips for this step/i })).not.toBeInTheDocument();
@@ -183,15 +182,23 @@ describe("ScanWizardPanel", () => {
   });
 
   it("blocks advancing past the dates step when every window has already ended", async () => {
+    // The range picker can't select a past date directly, so this simulates
+    // the realistic path instead: pick a valid near-future window, then let
+    // time pass (the user leaves the wizard open) until it's ended.
     wrap(<ScanWizardPanel onClose={vi.fn()} onCreated={vi.fn()} />);
 
     await userEvent.type(screen.getAllByLabelText(/add by id/i)[0], "2991");
     await userEvent.click(screen.getAllByRole("button", { name: /^add$/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
     await userEvent.click(screen.getByRole("button", { name: /add window/i }));
-    const dates = screen.getAllByDisplayValue("");
-    await userEvent.type(dates[0], "2026-04-01");
-    await userEvent.type(dates[1], "2026-04-03");
+    await userEvent.click(screen.getByRole("button", { name: "Search dates" }));
+    await userEvent.click(screen.getByRole("button", { name: "June 16, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "June 18, 2026" }));
+
+    vi.setSystemTime(new Date(2026, 5, 19, 12, 0, 0));
+    // The blocking check is computed at render time, so force a re-render
+    // after the clock jump rather than relying on one happening on its own.
+    await userEvent.click(screen.getByRole("switch", { name: "Weekends only" }));
     await userEvent.click(screen.getByRole("button", { name: "Next →" }));
 
     expect(screen.getByText(/at least one search window must end today or later/i))
