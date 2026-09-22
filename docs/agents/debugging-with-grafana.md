@@ -133,8 +133,8 @@ login step and places no cart holds:
 
 ```bash
 docker cp playwright_service/login_diagnose.py \
-    "$(docker compose ps -q playwright)":/tmp/login_diagnose.py
-docker compose exec -T playwright python /tmp/login_diagnose.py \
+    "$(docker compose ps -q playwright)":/app/login_diagnose.py
+docker compose exec -T playwright python /app/login_diagnose.py \
     --email you@example.com --password 'your-password'
 ```
 
@@ -145,6 +145,7 @@ docker compose exec -T playwright python /tmp/login_diagnose.py \
 | `AUTH_REJECTED` | an auth request was sent and refused — credentials or account state |
 | `SILENT_REJECTION` | form submitted, no auth request ever sent — reCAPTCHA bot scoring |
 | `SUCCESS` | sign-in works from this host |
+| `PAGE_OK` | `--no-submit` run: page and fields fine, no login attempted |
 
 `SILENT_REJECTION` is the interesting one: the client gives up before calling
 the API, so nothing reaches Recreation.gov to reject. The dominant input is

@@ -34,8 +34,15 @@ def test_silent_rejection_when_submitted_but_no_auth_request():
     assert verdict(submitted=True, auth_responses=[]) == "SILENT_REJECTION"
 
 
-def test_unknown_when_nothing_was_submitted():
-    assert verdict(submitted=False, auth_responses=[]) == "UNKNOWN"
+def test_page_ok_when_probing_without_a_login_attempt():
+    """--no-submit on a healthy page is a clean result, not an inconclusive one."""
+    assert verdict(submitted=False, auth_responses=[], form_rendered=True) == "PAGE_OK"
+
+
+def test_page_ok_requires_the_form_to_have_rendered():
+    """The login form is rendered client-side; a probe that ran too early must
+    not be reported as a healthy page."""
+    assert verdict(submitted=False, auth_responses=[], form_rendered=False) == "UNKNOWN"
 
 
 def test_success_takes_priority_over_a_stray_auth_response():
