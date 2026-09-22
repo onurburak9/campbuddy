@@ -7,6 +7,7 @@ import { Badge } from "../ui/Badge";
 import { Toggle } from "../ui/Toggle";
 import { PROVIDERS } from "../../types";
 import { search } from "../../api/search";
+import { CURATED_RECREATION_AREA_IDS } from "../../lib/curatedPlaces";
 import type { RecreationAreaResult, CampgroundResult } from "../../api/search";
 import type { ScanFormState, SelectedItem, Setter } from "./useScanFormState";
 import { formatInterval } from "../../lib/format";
@@ -58,6 +59,12 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
   const resolvedCampgroundIds = useResolveFallbackLabels(state.campgroundIds, search.resolveCampgrounds, (items) => set("campgroundIds", items));
   const resolvedCampsiteIds = useResolveFallbackLabels(state.campsiteIds, search.resolveCampsites, (items) => set("campsiteIds", items));
 
+  const { data: curatedRecAreas } = useQuery({
+    queryKey: ["curated-recreation-areas", CURATED_RECREATION_AREA_IDS],
+    queryFn: () => search.resolveRecreationAreas(CURATED_RECREATION_AREA_IDS),
+    staleTime: Infinity,
+  });
+
   const recAreaIds = resolvedRecAreaIds.map((i) => i.id);
   const campgroundIds = resolvedCampgroundIds.map((i) => i.id);
 
@@ -78,6 +85,7 @@ export function ProviderSitesFields({ state, set }: { state: ScanFormState; set:
         renderResult={(item) => <RecreationAreaResultRow item={item} />}
         placeholder="Search by name, e.g. Yosemite"
         idHint="Find this in the recreation.gov URL, e.g. https://www.recreation.gov/gateways/1076 → ID is 1076"
+        suggestions={curatedRecAreas}
       />
       <div data-tour="narrow-campground-campsite" className="space-y-4">
         <SearchSelect
