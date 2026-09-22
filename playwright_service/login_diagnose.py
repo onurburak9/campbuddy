@@ -108,6 +108,14 @@ def _probe(page, email, password, submit, settle):
         entry = {"status": resp.status, "url": url[:160]}
         signals["requests"].append(entry)
         if "recreation.gov" in url:
+            # The status alone doesn't say *why*. Recreation.gov returns 400
+            # with no visible error in the UI, so the body is the only place
+            # the reason exists. Request bodies are never read — they carry
+            # the password.
+            try:
+                entry["body"] = (resp.text() or "")[:600]
+            except Exception as e:
+                entry["body"] = f"<unreadable: {e}>"
             signals["auth_responses"].append(entry)
 
     page.on("response", on_response)
@@ -225,7 +233,9 @@ def main(argv=None) -> int:
               "logged_in", "visible_errors", "screenshot"):
         if k in signals:
             print(f"  {k}: {json.dumps(signals[k])[:300]}")
-    print(f"\n  non-telemetry POSTs: {json.dumps(signals.get('requests', []))[:500]}")
+    print(f"\n  non-telemetry POSTs: {json.dumps(signals.get('requests', []))[:600]}")
+    for a in signals.get("auth_responses", []):
+        print(f"\n  AUTH RESPONSE {a['status']} {a['url']}\n    body: {a.get('body', '')}")
     print(f"\n=== VERDICT: {verdict} ===\n{explanation}")
     return 0 if verdict == "SUCCESS" else 1
 
