@@ -19,6 +19,8 @@ interface SearchSelectProps<T extends Item> {
   tourId?: string;
   hint?: string;
   idHint?: string;
+  suggestions?: T[];
+  suggestionsLabel?: string;
 }
 
 export function SearchSelect<T extends Item>({
@@ -32,6 +34,8 @@ export function SearchSelect<T extends Item>({
   tourId,
   hint,
   idHint,
+  suggestions,
+  suggestionsLabel = "Popular parks",
 }: SearchSelectProps<T>) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<T[]>([]);
@@ -120,6 +124,7 @@ export function SearchSelect<T extends Item>({
           setQuery(e.target.value);
           setOpen(true);
         }}
+        onFocus={() => setOpen(true)}
       />
       {open && (
         <>
@@ -128,6 +133,27 @@ export function SearchSelect<T extends Item>({
           {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
             <p className="text-sm text-stone-500 dark:text-[#888]">No matches — try a different search or add by ID.</p>
           )}
+          {query.trim().length === 0 && suggestions && suggestions.length > 0 && (() => {
+            const unselected = suggestions.filter((s) => !selected.some((sel) => sel.id === s.id));
+            if (unselected.length === 0) return null;
+            return (
+              <div className="space-y-1.5">
+                <p className="text-xs text-stone-500 dark:text-[#888]">{suggestionsLabel}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unselected.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="rounded-full border border-forest-200 px-2.5 py-1 text-sm text-forest-700 hover:bg-forest-50 dark:border-[#333] dark:text-[#DDD] dark:hover:bg-[#222]"
+                      onClick={() => select(item)}
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {results.length > 0 && (
             <ul className="max-h-72 overflow-y-auto rounded-md border border-sand-200 dark:border-[#222]">
               {results.map((item) => (

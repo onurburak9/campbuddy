@@ -130,4 +130,68 @@ describe("SearchSelect", () => {
     );
     expect(screen.getByTitle("Find this in the recreation.gov URL")).toBeInTheDocument();
   });
+
+  it("shows suggestion chips on focus when the query is empty", async () => {
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[]}
+        onChange={vi.fn()}
+        search={vi.fn().mockResolvedValue([])}
+        suggestions={[{ id: 2991, name: "Yosemite National Park" }, { id: 2988, name: "Yellowstone National Park" }]}
+      />
+    );
+    await userEvent.click(screen.getByRole("textbox", { name: /recreation areas/i }));
+    expect(screen.getByText("Yosemite National Park")).toBeInTheDocument();
+    expect(screen.getByText("Yellowstone National Park")).toBeInTheDocument();
+  });
+
+  it("selects a suggestion chip and calls onChange with it appended", async () => {
+    const onChange = vi.fn();
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[]}
+        onChange={onChange}
+        search={vi.fn().mockResolvedValue([])}
+        suggestions={[{ id: 2991, name: "Yosemite National Park" }]}
+      />
+    );
+    await userEvent.click(screen.getByRole("textbox", { name: /recreation areas/i }));
+    await userEvent.click(screen.getByText("Yosemite National Park"));
+    expect(onChange).toHaveBeenCalledWith([{ id: 2991, name: "Yosemite National Park" }]);
+  });
+
+  it("hides suggestion chips once the query is non-empty", async () => {
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[]}
+        onChange={vi.fn()}
+        search={vi.fn().mockResolvedValue([])}
+        suggestions={[{ id: 2991, name: "Yosemite National Park" }]}
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /recreation areas/i });
+    await userEvent.click(input);
+    expect(screen.getByText("Yosemite National Park")).toBeInTheDocument();
+    await userEvent.type(input, "z");
+    expect(screen.queryByText("Yosemite National Park")).not.toBeInTheDocument();
+  });
+
+  it("omits a suggestion that is already selected", async () => {
+    render(
+      <SearchSelect
+        label="Recreation Areas"
+        selected={[{ id: 2991, name: "Yosemite National Park" }]}
+        onChange={vi.fn()}
+        search={vi.fn().mockResolvedValue([])}
+        suggestions={[{ id: 2991, name: "Yosemite National Park" }, { id: 2988, name: "Yellowstone National Park" }]}
+      />
+    );
+    await userEvent.click(screen.getByRole("textbox", { name: /recreation areas/i }));
+    expect(screen.getByText("Yellowstone National Park")).toBeInTheDocument();
+    // "Yosemite National Park" still appears once, as the selected chip — not duplicated in suggestions
+    expect(screen.getAllByText("Yosemite National Park")).toHaveLength(1);
+  });
 });

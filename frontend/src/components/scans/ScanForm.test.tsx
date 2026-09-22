@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationsFields, ProviderSitesFields } from "./ScanForm";
 import { PROVIDERS } from "../../types";
@@ -89,6 +90,17 @@ describe("ProviderSitesFields — id resolution", () => {
     await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
   });
 });
+describe("ProviderSitesFields — curated place suggestions", () => {
+  it("selecting a curated suggestion chip adds it to recAreaIds", async () => {
+    const set = vi.fn();
+    render(wrapWithQueryClient(<ProviderSitesFields state={makeState(300)} set={set} />));
+    await userEvent.click(screen.getByRole("textbox", { name: /recreation areas/i }));
+    await waitFor(() => expect(screen.getByText("Yosemite National Park")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("Yosemite National Park"));
+    expect(set).toHaveBeenCalledWith("recAreaIds", [{ id: 2991, name: "Yosemite National Park" }]);
+  });
+});
+
 describe("ProviderSitesFields — provider selection", () => {
   it("only enables RecreationDotGov; every other provider option is disabled", () => {
     render(wrapWithQueryClient(<ProviderSitesFields state={makeState(300)} set={() => {}} />));
