@@ -96,6 +96,40 @@ def _looks_blocked(title: str, body_text: str) -> bool:
     return any(m in haystack for m in BLOCK_MARKERS)
 
 
+# Whitelist, not blocklist: a successful login returns the whole account
+# object — name, home address, phone, email — alongside the JWT. Anything not
+# explicitly diagnostic is withheld.
+DIAGNOSTIC_KEYS = ("error", "message", "code", "detail", "reason", "title", "status")
+
+
+def redact_body(text: str) -> str:
+    """Keep the diagnostic fields of an auth response, drop everything else.
+
+    Output from this tool gets pasted into chats and issues, so the error must
+    survive printing while the token and PII must not.
+    """
+    if not text:
+        return ""
+    try:
+        data = json.loads(text)
+    except Exception:
+        return text[:600]
+    if not isinstance(data, dict):
+        return text[:600]
+    out = {}
+    for k, v in data.items():
+        if isinstance(v, bool) or v is None:
+            # Booleans can't carry PII and flags like prompt_mfa matter here.
+            out[k] = v
+        elif k.lower() in DIAGNOSTIC_KEYS and isinstance(v, (str, int, float)):
+            out[k] = v
+        elif isinstance(v, str):
+            out[k] = f"<redacted {len(v)} chars>"
+        else:
+            out[k] = "<redacted>"
+    return json.dumps(out)[:600]
+
+
 def _probe(page, email, password, submit, settle):
     signals = {"missing_fields": [], "auth_responses": [], "requests": []}
 
@@ -113,7 +147,7 @@ def _probe(page, email, password, submit, settle):
             # the reason exists. Request bodies are never read — they carry
             # the password.
             try:
-                entry["body"] = (resp.text() or "")[:600]
+                entry["body"] = redact_body(resp.text() or "")
             except Exception as e:
                 entry["body"] = f"<unreadable: {e}>"
             signals["auth_responses"].append(entry)
