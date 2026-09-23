@@ -31,12 +31,17 @@ import sys
 import time
 
 from playwright_service.browser import (
+    CONTEXT_OPTIONS,
     EMAIL_SELECTOR,
+    HEADLESS_ENV_VAR,
+    LAUNCH_ARGS,
     PlaywrightTimeout,
     LOGGED_IN_SELECTOR,
     LOGIN_URL,
     PASSWORD_SELECTOR,
+    STEALTH_JS,
     SUBMIT_BUTTON_NAME,
+    _browser_state,
     _human_type,
     _jitter,
     _new_context,
@@ -282,6 +287,12 @@ def main(argv=None) -> int:
     p.add_argument("--settle", type=int, default=60, help="seconds to watch after submit")
     p.add_argument("--as-macos", type=int, nargs="?", const=153, default=0,
                    metavar="MAJOR", help="present as macOS Chrome (default 153)")
+    p.add_argument("--channel", default=None,
+                   help="browser build to drive, e.g. chrome "
+                        "(install first: playwright install chrome)")
+    p.add_argument("--profile", default=None, metavar="DIR",
+                   help="persistent profile dir, so cookies and localStorage "
+                        "survive between runs")
     args = p.parse_args(argv)
 
     submit = not args.no_submit
@@ -290,10 +301,13 @@ def main(argv=None) -> int:
               "or pass --no-submit.", file=sys.stderr)
         return 2
 
-    print("=== Recreation.gov login diagnosis ===", flush=True)
+    print(f"=== Recreation.gov login diagnosis "
+          f"(channel={args.channel or 'bundled-chromium'}, "
+          f"profile={args.profile or 'fresh'}) ===", flush=True)
     try:
         signals = run_in_browser_thread(lambda: _probe_in_context(
-            args.email, args.password, submit, args.settle, args.as_macos))
+            args.email, args.password, submit, args.settle, args.as_macos,
+            args.channel, args.profile))
     finally:
         shutdown_browser()
 
@@ -313,10 +327,45 @@ def main(argv=None) -> int:
     return 0 if verdict == "SUCCESS" else 1
 
 
-def _probe_in_context(email, password, submit, settle, as_macos=0):
-    context = _new_context(get_shared_browser())
+def _make_context(channel=None, profile_dir=None):
+    """Context for the probe, optionally on a different browser build.
+
+    Playwright's bundled Chromium renders through SwiftShader under Xvfb and
+    fingerprints very differently from a real Google Chrome — which is the
+    remaining difference between the browser that gets 200 from the production
+    IP and the one that gets 400. `channel="chrome"` drives an actual Chrome
+    install; `profile_dir` keeps cookies and localStorage between runs.
+
+    The dedicated browser is deliberately never closed: browser.close() does
+    not return for a headed Chromium here. shutdown_browser() reaps it through
+    playwright.stop() when main() finishes.
+    """
+    get_shared_browser()  # ensures the playwright driver is running
+    playwright = _browser_state["playwright"]
+    headless = os.getenv(HEADLESS_ENV_VAR, "false").lower() == "true"
+
+    if profile_dir:
+        context = playwright.chromium.launch_persistent_context(
+            profile_dir, headless=headless, channel=channel or None,
+            args=LAUNCH_ARGS, **CONTEXT_OPTIONS)
+        context.add_init_script(STEALTH_JS)
+        return context
+    if channel:
+        browser_ = playwright.chromium.launch(
+            headless=headless, channel=channel, args=LAUNCH_ARGS)
+        context = browser_.new_context(**CONTEXT_OPTIONS)
+        context.add_init_script(STEALTH_JS)
+        return context
+    return _new_context(get_shared_browser())
+
+
+def _probe_in_context(email, password, submit, settle, as_macos=0,
+                      channel=None, profile_dir=None):
+    context = _make_context(channel, profile_dir)
     try:
-        return _probe(context.new_page(), email, password, submit, settle, as_macos)
+        # A persistent context opens with a page already attached.
+        page = context.pages[0] if context.pages else context.new_page()
+        return _probe(page, email, password, submit, settle, as_macos)
     finally:
         context.close()
 
