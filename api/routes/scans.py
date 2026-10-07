@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from api.deps import get_db_dep, get_current_user
-from api.schemas import ScanCreate, ScanUpdate, ScanResponse, ScanRunResponse, ScanResultResponse, ScanStatsResponse, RunsCountResponse
+from api.schemas import ScanCreate, ScanUpdate, ScanResponse, ScanRunResponse, ScanResultResponse, ScanStatsResponse, RunsCountResponse, DailyStatsBucket
 from core.services import scans as scans_svc
 from core.services import history as history_svc
 from db.models import ScanOutcome
@@ -100,3 +100,13 @@ def list_results(
 @router.get("/{scan_id}/stats", response_model=ScanStatsResponse)
 def get_stats(scan_id: int, db: Session = Depends(get_db_dep), user=Depends(get_current_user)):
     return history_svc.stats(db, scan_id, user.id)
+
+
+@router.get("/{scan_id}/stats/daily", response_model=List[DailyStatsBucket])
+def get_daily_stats(
+    scan_id: int,
+    days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db_dep),
+    user=Depends(get_current_user),
+):
+    return history_svc.daily_stats(db, scan_id, user.id, days=days)

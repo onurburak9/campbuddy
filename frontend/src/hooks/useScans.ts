@@ -25,6 +25,14 @@ export function useScanStats(id: number | null) {
   });
 }
 
+export function useScanDailyStats(id: number | null, days: number) {
+  return useQuery({
+    queryKey: id ? queryKeys.dailyStats(id, days) : ["scans", "none", "stats", "daily"],
+    queryFn: () => scans.dailyStats(id as number, days),
+    enabled: id != null,
+  });
+}
+
 export function useCreateScan() {
   const qc = useQueryClient();
   return useMutation({

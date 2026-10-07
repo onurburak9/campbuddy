@@ -471,3 +471,93 @@ def test_stats_last_run_duration_seconds_from_most_recently_started_finished_run
     db.flush()
     result = stats(db, scan.id, u.id)
     assert result["last_run_duration_seconds"] == 7
+
+
+def _make_run_at(db, scan_id, started_at, outcome):
+    run = ScanRun(scan_id=scan_id, started_at=started_at, finished_at=started_at, outcome=outcome)
+    db.add(run)
+    db.flush()
+    return run
+
+
+def _make_result_at(db, scan_id, run_id, first_seen_at, campsite_id):
+    r = _make_result(db, scan_id, run_id)
+    r.campsite_id = campsite_id
+    r.first_seen_at = first_seen_at
+    db.flush()
+    return r
+
+
+def test_daily_stats_returns_zero_filled_buckets_oldest_first(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    result = history_svc.daily_stats(db, scan.id, u.id, days=7)
+    today = datetime.now(timezone.utc).date()
+    assert [b["date"] for b in result] == [today - timedelta(days=6 - i) for i in range(7)]
+    assert all(
+        b["runs"] == b["successes"] == b["no_results"] == b["errors"] == b["new_sites"] == 0
+        for b in result
+    )
+
+
+def test_daily_stats_buckets_runs_by_outcome_and_day(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(days=1)
+    _make_run_at(db, scan.id, now, ScanOutcome.success)
+    _make_run_at(db, scan.id, now, ScanOutcome.error)
+    _make_run_at(db, scan.id, yesterday, ScanOutcome.no_results)
+    _make_run_at(db, scan.id, yesterday, ScanOutcome.success)
+    _make_run_at(db, scan.id, yesterday, None)
+    result = history_svc.daily_stats(db, scan.id, u.id, days=3)
+    by_date = {b["date"]: b for b in result}
+    t = by_date[now.date()]
+    assert (t["runs"], t["successes"], t["no_results"], t["errors"]) == (2, 1, 0, 1)
+    y = by_date[yesterday.date()]
+    assert (y["runs"], y["successes"], y["no_results"], y["errors"]) == (3, 1, 1, 0)
+
+
+def test_daily_stats_counts_new_sites_by_first_seen_day(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    now = datetime.now(timezone.utc)
+    run = _make_run_at(db, scan.id, now, ScanOutcome.success)
+    _make_result_at(db, scan.id, run.id, now, "A")
+    _make_result_at(db, scan.id, run.id, now, "B")
+    _make_result_at(db, scan.id, run.id, now - timedelta(days=2), "C")
+    result = history_svc.daily_stats(db, scan.id, u.id, days=3)
+    assert [b["new_sites"] for b in result] == [1, 0, 2]
+
+
+def test_daily_stats_excludes_activity_outside_window_and_other_scans(db):
+    u = make_user(db)
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    other = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add_all([scan, other])
+    db.flush()
+    now = datetime.now(timezone.utc)
+    old = now - timedelta(days=10)
+    old_run = _make_run_at(db, scan.id, old, ScanOutcome.success)
+    _make_result_at(db, scan.id, old_run.id, old, "A")
+    other_run = _make_run_at(db, other.id, now, ScanOutcome.success)
+    _make_result_at(db, other.id, other_run.id, now, "B")
+    result = history_svc.daily_stats(db, scan.id, u.id, days=7)
+    assert sum(b["runs"] for b in result) == 0
+    assert sum(b["new_sites"] for b in result) == 0
+
+
+def test_daily_stats_raises_not_found_for_wrong_owner(db):
+    u = make_user(db)
+    u2 = make_user(db, email="other@example.com")
+    scan = Scan(user_id=u.id, search_windows=WINDOWS)
+    db.add(scan)
+    db.flush()
+    with pytest.raises(NotFound):
+        history_svc.daily_stats(db, scan.id, u2.id)
