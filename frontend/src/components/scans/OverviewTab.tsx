@@ -1,10 +1,13 @@
-import { useScanStats } from "../../hooks/useScans";
+import { useScanStats, useScanDailyStats } from "../../hooks/useScans";
 import { useScanRuns } from "../../hooks/useRuns";
 import { useScanResults } from "../../hooks/useResults";
 import { relativeTime, relativeFuture, formatSeconds } from "../../lib/format";
 import { StatsRow } from "./StatsRow";
 import { RunHealthBar } from "./RunHealthBar";
 import { ConfigCard } from "./ConfigCard";
+import { DailyTrends } from "./DailyTrends";
+
+const TREND_DAYS = 14;
 import type { Scan } from "../../types";
 
 export function OverviewTab({ scan }: { scan: Scan }) {
@@ -13,6 +16,7 @@ export function OverviewTab({ scan }: { scan: Scan }) {
     refetchInterval: stats?.total_runs === 0 ? 5000 : false,
   });
   const { data: results = [] } = useScanResults(scan.id, 1);
+  const { data: daily = [] } = useScanDailyStats(scan.id, TREND_DAYS);
 
   const lastChecked = runs[0]?.started_at;
   const lastFound = results[0]?.first_seen_at;
@@ -35,6 +39,10 @@ export function OverviewTab({ scan }: { scan: Scan }) {
       <div>
         <h3 className="mb-2 text-sm font-semibold text-stone-700 dark:text-[#CCC]">Recent Run Health</h3>
         <RunHealthBar runs={runs} />
+      </div>
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-stone-700 dark:text-[#CCC]">Last {TREND_DAYS} Days</h3>
+        <DailyTrends days={daily} />
       </div>
       <ConfigCard scan={scan} />
     </div>

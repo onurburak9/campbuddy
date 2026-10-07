@@ -264,6 +264,7 @@ def test_all_scan_routes_require_auth(client):
         "/api/v1/scans/1/runs/count",
         "/api/v1/scans/1/results",
         "/api/v1/scans/1/stats",
+        "/api/v1/scans/1/stats/daily",
     ]:
         resp = client.get(path)
         assert resp.status_code == 401, f"GET {path} should return 401"
@@ -404,3 +405,35 @@ def test_get_stats_includes_next_run_and_duration_fields(auth_client):
     assert "next_run_at" in data
     assert data["next_run_at"] is not None  # never-run active scan → "now"
     assert data["last_run_duration_seconds"] is None
+
+
+def test_get_daily_stats_returns_requested_number_of_buckets(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats/daily?days=14")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 14
+    assert set(data[0]) == {"date", "runs", "successes", "no_results", "errors", "new_sites"}
+
+
+def test_get_daily_stats_defaults_to_30_days(auth_client):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats/daily")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 30
+
+
+@pytest.mark.parametrize("days", [0, 91])
+def test_get_daily_stats_rejects_out_of_range_days(auth_client, days):
+    client, info = auth_client
+    scan_id = _make_scan(info["id"])
+    resp = client.get(f"/api/v1/scans/{scan_id}/stats/daily?days={days}")
+    assert resp.status_code == 422
+
+
+def test_get_daily_stats_returns_404_for_missing_scan(auth_client):
+    client, _ = auth_client
+    resp = client.get("/api/v1/scans/9999/stats/daily")
+    assert resp.status_code == 404

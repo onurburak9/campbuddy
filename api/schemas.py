@@ -224,6 +224,15 @@ class ScanResultResponse(BaseModel):
         orm_mode = True
 
 
+class DailyStatsBucket(BaseModel):
+    date: date
+    runs: int
+    successes: int
+    no_results: int
+    errors: int
+    new_sites: int
+
+
 class ScanStatsResponse(BaseModel):
     sites_found: int
     in_cart: int

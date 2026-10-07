@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time
 from typing import Optional
 from db.models import ScanRun, ScanResult, ScanOutcome, ScanStatus
 from core.services.scans import get_scan
@@ -116,3 +116,41 @@ def stats(db, scan_id: int, user_id: int) -> dict:
         "next_run_at": next_run_at,
         "last_run_duration_seconds": last_run_duration_seconds,
     }
+
+
+def daily_stats(db, scan_id: int, user_id: int, days: int = 30) -> list:
+    get_scan(db, scan_id, user_id)
+    today = _now().date()
+    first_day = today - timedelta(days=days - 1)
+    window_start = datetime.combine(first_day, time.min, tzinfo=timezone.utc)
+    buckets = {
+        first_day + timedelta(days=i): {
+            "runs": 0, "successes": 0, "no_results": 0, "errors": 0, "new_sites": 0,
+        }
+        for i in range(days)
+    }
+
+    runs = _filtered_runs_query(db, scan_id, started_after=window_start).all()
+    for run in runs:
+        bucket = buckets.get(run.started_at.astimezone(timezone.utc).date())
+        if bucket is None:
+            continue
+        bucket["runs"] += 1
+        if run.outcome == ScanOutcome.success:
+            bucket["successes"] += 1
+        elif run.outcome == ScanOutcome.no_results:
+            bucket["no_results"] += 1
+        elif run.outcome == ScanOutcome.error:
+            bucket["errors"] += 1
+
+    first_seen = (
+        db.query(ScanResult.first_seen_at)
+        .filter(ScanResult.scan_id == scan_id, ScanResult.first_seen_at >= window_start)
+        .all()
+    )
+    for (seen_at,) in first_seen:
+        bucket = buckets.get(seen_at.astimezone(timezone.utc).date())
+        if bucket is not None:
+            bucket["new_sites"] += 1
+
+    return [{"date": day, **counts} for day, counts in buckets.items()]

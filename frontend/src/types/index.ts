@@ -21,6 +21,15 @@ export interface ScanStats {
   last_run_duration_seconds: number | null;
 }
 
+export interface DailyStatsBucket {
+  date: string; // ISO date YYYY-MM-DD, UTC day
+  runs: number;
+  successes: number;
+  no_results: number;
+  errors: number;
+  new_sites: number;
+}
+
 export interface SearchWindow {
   start_date: string; // ISO date YYYY-MM-DD
   end_date: string;

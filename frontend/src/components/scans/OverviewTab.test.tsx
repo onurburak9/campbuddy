@@ -25,6 +25,7 @@ describe("OverviewTab", () => {
         next_run_at: NEXT_RUN_AT, last_run_duration_seconds: 12,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([{ id: 9, scan_id: 7, started_at: "2026-06-30T11:00:00Z", finished_at: "2026-06-30T11:00:03Z", outcome: "success", sites_found: 1, error_message: null }])),
+      http.get("/api/v1/scans/7/stats/daily", () => HttpResponse.json([])),
       http.get("/api/v1/scans/7/results", () => HttpResponse.json([{ id: 3, scan_run_id: 9, scan_id: 7, campsite_id: "A1", facility_name: "F", site_name: "S", campsite_type: "TENT", booking_date: "2026-07-01", booking_end_date: "2026-07-03", booking_url: "x", first_seen_at: "2026-06-30T11:00:00Z", last_seen_at: "2026-06-30T11:00:00Z", is_available: true, cart_added: false, notified: true }])),
     );
     wrap(<OverviewTab scan={scan} />);
@@ -44,6 +45,7 @@ describe("OverviewTab", () => {
         next_run_at: NEXT_RUN_AT, last_run_duration_seconds: 12,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([])),
+      http.get("/api/v1/scans/7/stats/daily", () => HttpResponse.json([])),
       http.get("/api/v1/scans/7/results", () => HttpResponse.json([])),
     );
     wrap(<OverviewTab scan={scan} />);
@@ -63,11 +65,35 @@ describe("OverviewTab", () => {
         next_run_at: null, last_run_duration_seconds: null,
       })),
       http.get("/api/v1/scans/7/runs", () => HttpResponse.json([])),
+      http.get("/api/v1/scans/7/stats/daily", () => HttpResponse.json([])),
       http.get("/api/v1/scans/7/results", () => HttpResponse.json([])),
     );
     wrap(<OverviewTab scan={scan} />);
     await waitFor(() => expect(screen.getByText(/Next run/i)).toBeInTheDocument());
     const nextRunRow = screen.getByText(/Next run/i).closest("span");
     expect(nextRunRow).toHaveTextContent("—");
+  });
+
+  it("renders daily trend charts from the daily stats endpoint", async () => {
+    server.use(
+      http.get("/api/v1/scans/7/stats", () => HttpResponse.json({
+        sites_found: 0, in_cart: 0, total_runs: 3, success_rate: 0, hit_rate: 0,
+        next_run_at: null, last_run_duration_seconds: null,
+      })),
+      http.get("/api/v1/scans/7/stats/daily", ({ request }) => {
+        expect(new URL(request.url).searchParams.get("days")).toBe("14");
+        return HttpResponse.json([
+          { date: "2026-06-29", runs: 0, successes: 0, no_results: 0, errors: 0, new_sites: 0 },
+          { date: "2026-06-30", runs: 3, successes: 1, no_results: 1, errors: 1, new_sites: 4 },
+        ]);
+      }),
+      http.get("/api/v1/scans/7/runs", () => HttpResponse.json([])),
+      http.get("/api/v1/scans/7/results", () => HttpResponse.json([])),
+    );
+    wrap(<OverviewTab scan={scan} />);
+    expect(screen.getByText("Last 14 Days")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("67% overall")).toBeInTheDocument());
+    expect(screen.getByText("3 total")).toBeInTheDocument();
+    expect(screen.getByText("4 total")).toBeInTheDocument();
   });
 });

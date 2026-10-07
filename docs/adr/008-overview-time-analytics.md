@@ -1,7 +1,9 @@
-# ADR 008: Overview time-series analytics (deferred)
+# ADR 008: Overview time-series analytics
 
 **Date:** 2026-07-01
-**Status:** Proposed (deferred — follow-up to the results/runs/overview filters work)
+**Status:** Accepted — implemented (#19). `GET /scans/{id}/stats/daily?days=N`
+(1–90, default 30, UTC day buckets, zero-filled); the Overview renders the last
+14 days.
 
 ## Context
 

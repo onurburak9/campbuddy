@@ -1,5 +1,5 @@
 import { fetchApi } from "./client";
-import type { Scan, ScanCreatePayload, ScanUpdatePayload, ScanStats } from "../types";
+import type { Scan, ScanCreatePayload, ScanUpdatePayload, ScanStats, DailyStatsBucket } from "../types";
 
 export const scans = {
   list: () => fetchApi<Scan[]>("/scans"),
@@ -12,4 +12,6 @@ export const scans = {
   pause: (id: number) => fetchApi<Scan>(`/scans/${id}/pause`, { method: "POST" }),
   resume: (id: number) => fetchApi<Scan>(`/scans/${id}/resume`, { method: "POST" }),
   stats: (id: number) => fetchApi<ScanStats>(`/scans/${id}/stats`),
+  dailyStats: (id: number, days: number) =>
+    fetchApi<DailyStatsBucket[]>(`/scans/${id}/stats/daily?days=${days}`),
 };
