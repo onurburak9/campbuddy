@@ -17,6 +17,23 @@ export default {
           800: "#5F2613", 900: "#3D180C",
         },
         sand: { 50: "#FAF9F6", 100: "#F0EFED", 200: "#DFDCD9" },
+        night: { 700: "#1E2A4A", 800: "#141C36", 900: "#0B1024" },
+      },
+      fontFamily: {
+        display: ['"Bricolage Grotesque"', "ui-sans-serif", "system-ui", "sans-serif"],
+        code: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
+      },
+      keyframes: {
+        "fade-up": { "0%": { opacity: "0", transform: "translateY(8px)" }, "100%": { opacity: "1", transform: "none" } },
+        sweep: { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } },
+        flicker: { "0%,100%": { transform: "scaleY(1)" }, "50%": { transform: "scaleY(1.08) skewX(-2deg)" } },
+        twinkle: { "0%,100%": { opacity: "0.25" }, "50%": { opacity: "1" } },
+      },
+      animation: {
+        "fade-up": "fade-up 0.4s ease-out both",
+        sweep: "sweep 4s linear infinite",
+        flicker: "flicker 1.6s ease-in-out infinite",
+        twinkle: "twinkle 3s ease-in-out infinite",
       },
     },
   },
