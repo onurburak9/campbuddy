@@ -7,3 +7,7 @@
     @apply bg-sand-50 text-stone-900 antialiased dark:bg-[#0D0D0D] dark:text-[#EEEEEE];
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
